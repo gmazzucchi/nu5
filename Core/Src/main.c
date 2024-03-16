@@ -22,6 +22,8 @@
 #include "gpio.h"
 #include "icache.h"
 #include "memorymap.h"
+#include "sai.h"
+#include "tim.h"
 #include "ucpd.h"
 #include "usart.h"
 #include "usb_otg.h"
@@ -61,6 +63,57 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#include <string.h>
+
+// #define TEST_SWITCH
+// #define TEST_INTERRUPTS
+// #define TEST_TIMER
+
+#ifdef TEST_INTERRUPTS
+const char falling_message[] = "falling interrupts enabled\n";
+const char rising_message[] = "rising interrupts enabled\n";
+const char enable_it_msg[] = "enabling interrupts\n";
+const char disable_it_msg[] = "disabling interrupts\n";
+
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == USER_BUTTON_Pin) {
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+    HAL_UART_Transmit(&huart1, (uint8_t *)falling_message,
+                      strlen(falling_message), 100);
+  }
+}
+
+void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == USER_BUTTON_Pin) {
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    HAL_UART_Transmit(&huart1, (uint8_t *)rising_message,
+                      strlen(rising_message), 100);
+  }
+}
+#endif
+
+#ifdef TEST_TIMER
+int flag = 0;
+uint32_t counter = 0;
+#define COUNTER_LIMIT (10U)
+
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim) {
+  if (htim == &htim1) {
+    if (counter == COUNTER_LIMIT) {
+      counter = 0;
+      flag = 1;
+    }
+    counter++;
+  }
+}
+
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+  if (htim == &htim1) {
+    // flag = 1;
+  }
+}
+#endif
+
 /* USER CODE END 0 */
 
 /**
@@ -96,18 +149,76 @@ int main(void) {
   MX_UCPD1_Init();
   MX_USART1_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_TIM1_Init();
+  MX_SAI1_Init();
   /* USER CODE BEGIN 2 */
 
+#ifdef TEST_TIMER
+  const char message[] = "Son vivo\r\n";
+#endif
+
+#ifdef TEST_SWITCH
+  const char message[] = "Son vivo\r\n";
   uint32_t ptime = HAL_GetTick();
   uint32_t current_time;
-  const char message[10] = "Son vivo\n";
   GPIO_PinState pstate = GPIO_PIN_RESET;
+#endif
+
+#ifdef TEST_INTERRUPTS
+  uint32_t firstts = HAL_GetTick();
+#endif
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+
+#ifdef TEST_INTERRUPTS
+    while (HAL_GetTick() - firstts < 3000)
+      ; // wait 5 seconds
+
+    __disable_irq();
+    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin,
+                      GPIO_PIN_SET); // notify that interrupts are disabled
+    HAL_UART_Transmit(&huart1, (uint8_t *)disable_it_msg,
+                      strlen(disable_it_msg), 100);
+
+    GPIO_PinState button_pressed = GPIO_PIN_RESET;
+    do {
+      button_pressed = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin);
+    } while (button_pressed ==
+             GPIO_PIN_RESET); // wait for the button to be pressed
+
+    button_pressed = GPIO_PIN_SET;
+    do {
+      button_pressed = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin);
+    } while (button_pressed ==
+             GPIO_PIN_SET); // wait for the button to be pressed
+
+    button_pressed = GPIO_PIN_RESET;
+    do {
+      button_pressed = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin);
+    } while (button_pressed ==
+             GPIO_PIN_RESET); // wait for the button to be pressed
+
+    button_pressed = GPIO_PIN_SET;
+    do {
+      button_pressed = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin);
+    } while (button_pressed ==
+             GPIO_PIN_SET); // wait for the button to be pressed
+
+    HAL_GPIO_WritePin(
+        LED_BLUE_GPIO_Port, LED_BLUE_Pin,
+        GPIO_PIN_RESET); // notify that interrupts are enabled again
+    HAL_UART_Transmit(&huart1, (uint8_t *)enable_it_msg, strlen(enable_it_msg),
+                      100);
+    __enable_irq();
+    while (1)
+      ;
+#endif
+
+#ifdef TEST_SWITCH
     GPIO_PinState switch_state =
         HAL_GPIO_ReadPin(USER_SWITCH_GPIO_Port, USER_SWITCH_Pin);
     if (switch_state != pstate) {
@@ -121,7 +232,15 @@ int main(void) {
       HAL_UART_Transmit(&huart1, (uint8_t *)message, 10, 100);
       HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
     }
+#endif
 
+#ifdef TEST_TIMER
+    HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
+    while (!flag)
+      ;
+    flag = 0;
+    HAL_UART_Transmit(&huart1, (uint8_t *)message, sizeof(message), 100);
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -153,16 +272,16 @@ void SystemClock_Config(void) {
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_4;
+  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_0;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_MSI;
-  RCC_OscInitStruct.PLL.PLLMBOOST = RCC_PLLMBOOST_DIV1;
-  RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 80;
+  RCC_OscInitStruct.PLL.PLLMBOOST = RCC_PLLMBOOST_DIV4;
+  RCC_OscInitStruct.PLL.PLLM = 3;
+  RCC_OscInitStruct.PLL.PLLN = 10;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLQ = 2;
-  RCC_OscInitStruct.PLL.PLLR = 2;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLLVCIRANGE_0;
+  RCC_OscInitStruct.PLL.PLLR = 1;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLLVCIRANGE_1;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
     Error_Handler();
