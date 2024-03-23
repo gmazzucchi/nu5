@@ -26,6 +26,7 @@
 /* USER CODE END 0 */
 
 SAI_HandleTypeDef hsai_BlockA1;
+DMA_HandleTypeDef handle_GPDMA1_Channel0;
 
 /* SAI1 init function */
 void MX_SAI1_Init(void) {
@@ -105,6 +106,34 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF13_SAI1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    /* Peripheral DMA init*/
+
+    handle_GPDMA1_Channel0.Instance = GPDMA1_Channel0;
+    handle_GPDMA1_Channel0.Init.Request = GPDMA1_REQUEST_SAI1_A;
+    handle_GPDMA1_Channel0.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
+    handle_GPDMA1_Channel0.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    handle_GPDMA1_Channel0.Init.SrcInc = DMA_SINC_FIXED;
+    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_FIXED;
+    handle_GPDMA1_Channel0.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
+    handle_GPDMA1_Channel0.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
+    handle_GPDMA1_Channel0.Init.Priority = DMA_HIGH_PRIORITY;
+    handle_GPDMA1_Channel0.Init.SrcBurstLength = 1;
+    handle_GPDMA1_Channel0.Init.DestBurstLength = 1;
+    handle_GPDMA1_Channel0.Init.TransferAllocatedPort =
+        DMA_SRC_ALLOCATED_PORT0 | DMA_DEST_ALLOCATED_PORT0;
+    handle_GPDMA1_Channel0.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
+    handle_GPDMA1_Channel0.Init.Mode = DMA_NORMAL;
+    if (HAL_DMA_Init(&handle_GPDMA1_Channel0) != HAL_OK) {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(saiHandle, hdmatx, handle_GPDMA1_Channel0);
+
+    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel0,
+                                        DMA_CHANNEL_NPRIV) != HAL_OK) {
+      Error_Handler();
+    }
   }
 }
 
@@ -125,6 +154,8 @@ void HAL_SAI_MspDeInit(SAI_HandleTypeDef *saiHandle) {
     PE6     ------> SAI1_SD_A
     */
     HAL_GPIO_DeInit(GPIOE, GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6);
+
+    HAL_DMA_DeInit(saiHandle->hdmatx);
   }
 }
 

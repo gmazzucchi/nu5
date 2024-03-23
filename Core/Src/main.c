@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "gpdma.h"
 #include "gpio.h"
 #include "icache.h"
 #include "memorymap.h"
@@ -32,6 +33,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "arm_math.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -118,6 +120,20 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 }
 #endif
 
+bool dma_completed = true;
+
+void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef *hsai) {
+  if (hsai == &hsai_BlockA1) {
+    dma_completed = true;
+  }
+}
+
+void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
+  if (hsai == &hsai_BlockA1) {
+    dma_completed = true;
+  }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -148,13 +164,14 @@ int main(void) {
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ADC1_Init();
+  MX_GPDMA1_Init();
   MX_ICACHE_Init();
   MX_UCPD1_Init();
   MX_USART1_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
-  MX_TIM1_Init();
+  MX_ADC1_Init();
   MX_SAI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
 #ifdef TEST_TIMER
@@ -171,25 +188,19 @@ int main(void) {
 #ifdef TEST_INTERRUPTS
   uint32_t firstts = HAL_GetTick();
 #endif
-// #define SAMPLE_MESSAGE_SIZE 124
-  // char sample_message[SAMPLE_MESSAGE_SIZE];
-  // size_t idx = 0;
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    /*
-        if (idx == 50274)
-          idx = 0;
-        int msglen = snprintf(sample_message, SAMPLE_MESSAGE_SIZE, "%Lf \r\n",
-                              sample_44kHz[idx]);
-        HAL_UART_Transmit(&huart1, (uint8_t *)sample_message, msglen, 200);
-        idx++;
-    */
+    if (dma_completed) {
+      dma_completed = false;
+      HAL_SAI_Transmit_DMA(&hsai_BlockA1, (uint16_t *)sample_44kHz,
+                           SAMPLE_44KHZ_SIZE);
+    }
 
-    HAL_SAI_Transmit(&hsai_BlockA1, (uint16_t*) sample_44kHz, SAMPLE_44KHZ_SIZE, 3000);
+    // HAL_SAI_Transmit(&hsai_BlockA1, (uint16_t *)sample_44kHz,
+    // SAMPLE_44KHZ_SIZE, 3000);
 
 #ifdef TEST_INTERRUPTS
     while (HAL_GetTick() - firstts < 3000)

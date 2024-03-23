@@ -138,7 +138,7 @@ extern "C" {
 #if !defined(HSI48_VALUE)
 #define HSI48_VALUE                                                            \
   48000000UL /*!< Value of the Internal High Speed oscillator for USB          \
-               FS/SDMMC/RNG in Hz. The real value my vary depending on         \
+               FS/SDMMC/RNG in Hz. The real value my vary depending on                                           \
                manufacturing process variations.*/
 #endif       /* HSI48_VALUE */
 
