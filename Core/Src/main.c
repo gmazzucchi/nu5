@@ -31,6 +31,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "arm_math.h"
+#include <stdio.h>
+#include <string.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -167,12 +171,25 @@ int main(void) {
 #ifdef TEST_INTERRUPTS
   uint32_t firstts = HAL_GetTick();
 #endif
+// #define SAMPLE_MESSAGE_SIZE 124
+  // char sample_message[SAMPLE_MESSAGE_SIZE];
+  // size_t idx = 0;
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+    /*
+        if (idx == 50274)
+          idx = 0;
+        int msglen = snprintf(sample_message, SAMPLE_MESSAGE_SIZE, "%Lf \r\n",
+                              sample_44kHz[idx]);
+        HAL_UART_Transmit(&huart1, (uint8_t *)sample_message, msglen, 200);
+        idx++;
+    */
+
+    HAL_SAI_Transmit(&hsai_BlockA1, (uint16_t*) sample_44kHz, SAMPLE_44KHZ_SIZE, 3000);
 
 #ifdef TEST_INTERRUPTS
     while (HAL_GetTick() - firstts < 3000)

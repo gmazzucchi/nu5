@@ -75,6 +75,7 @@ includeDirectories:
   - Core/Inc/**
   - Core/Lib/**
   - Src/**
+  - Drivers/CMSIS/DSP/Include/
   - Core/Src/**
   - Core/Lib/**
 

@@ -44,10 +44,10 @@ void MX_SAI1_Init(void) {
   hsai_BlockA1.Init.OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
   hsai_BlockA1.Init.NoDivider = SAI_MASTERDIVIDER_ENABLE;
   hsai_BlockA1.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
-  hsai_BlockA1.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_192K;
+  hsai_BlockA1.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_44K;
   hsai_BlockA1.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
   hsai_BlockA1.Init.MckOutput = SAI_MCK_OUTPUT_DISABLE;
-  hsai_BlockA1.Init.MonoStereoMode = SAI_STEREOMODE;
+  hsai_BlockA1.Init.MonoStereoMode = SAI_MONOMODE;
   hsai_BlockA1.Init.CompandingMode = SAI_NOCOMPANDING;
   hsai_BlockA1.Init.TriState = SAI_OUTPUT_NOTRELEASED;
   if (HAL_SAI_InitProtocol(&hsai_BlockA1, SAI_I2S_STANDARD,
@@ -75,7 +75,7 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
     PeriphClkInit.PLL2.PLL2Source = RCC_PLLSOURCE_MSI;
     PeriphClkInit.PLL2.PLL2M = 3;
     PeriphClkInit.PLL2.PLL2N = 8;
-    PeriphClkInit.PLL2.PLL2P = 1;
+    PeriphClkInit.PLL2.PLL2P = 2;
     PeriphClkInit.PLL2.PLL2Q = 2;
     PeriphClkInit.PLL2.PLL2R = 2;
     PeriphClkInit.PLL2.PLL2RGE = RCC_PLLVCIRANGE_1;
@@ -87,6 +87,10 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
 
     if (SAI1_client == 0) {
       __HAL_RCC_SAI1_CLK_ENABLE();
+
+      /* Peripheral interrupt init*/
+      HAL_NVIC_SetPriority(SAI1_IRQn, 0, 0);
+      HAL_NVIC_EnableIRQ(SAI1_IRQn);
     }
     SAI1_client++;
 
@@ -112,6 +116,7 @@ void HAL_SAI_MspDeInit(SAI_HandleTypeDef *saiHandle) {
     if (SAI1_client == 0) {
       /* Peripheral clock disable */
       __HAL_RCC_SAI1_CLK_DISABLE();
+      HAL_NVIC_DisableIRQ(SAI1_IRQn);
     }
 
     /**SAI1_A_Block_A GPIO Configuration

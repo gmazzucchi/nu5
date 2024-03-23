@@ -1,0 +1,5 @@
+#include <stdint.h>
+
+#define SAMPLE_44KHZ_SIZE 50274
+
+extern int16_t sample_44kHz[SAMPLE_44KHZ_SIZE];

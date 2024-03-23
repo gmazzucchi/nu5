@@ -55,6 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern SAI_HandleTypeDef hsai_BlockA1;
 extern TIM_HandleTypeDef htim1;
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 /* USER CODE BEGIN EV */
@@ -261,6 +262,19 @@ void OTG_FS_IRQHandler(void) {
   /* USER CODE BEGIN OTG_FS_IRQn 1 */
 
   /* USER CODE END OTG_FS_IRQn 1 */
+}
+
+/**
+ * @brief This function handles Serial Audio Interface 1 global interrupt.
+ */
+void SAI1_IRQHandler(void) {
+  /* USER CODE BEGIN SAI1_IRQn 0 */
+
+  /* USER CODE END SAI1_IRQn 0 */
+  HAL_SAI_IRQHandler(&hsai_BlockA1);
+  /* USER CODE BEGIN SAI1_IRQn 1 */
+
+  /* USER CODE END SAI1_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
