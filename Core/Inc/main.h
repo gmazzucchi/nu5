@@ -45,6 +45,7 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 
 #include "sample_44kHz.h"
+#include "sample_long_44kHz.h"
 
 /* USER CODE END Includes */
 

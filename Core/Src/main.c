@@ -121,16 +121,65 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 #endif
 
 bool dma_completed = true;
+bool sai_it_completed = true;
 
-void HAL_SAI_RxCpltCallback(SAI_HandleTypeDef *hsai) {
-  if (hsai == &hsai_BlockA1) {
-    dma_completed = true;
-  }
-}
+#define SAMPLING_FREQUENCY (22500U)
+#define CURRENT_NOTE_DURATION (1U) // in s
+#define CURRENT_NOTE_LENGTH (SAMPLING_FREQUENCY * CURRENT_NOTE_DURATION)
 
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
   if (hsai == &hsai_BlockA1) {
     dma_completed = true;
+    sai_it_completed = true;
+  }
+}
+void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
+  if (hsai == &hsai_BlockA1) {
+    HAL_UART_Transmit(&huart1, (uint8_t *)"Va Male\r\n", 10, 50);
+  }
+}
+
+#define SEMITONE_RATIO 1.059463094
+
+/*
+  [audio_content, sampl_freq] = audioread("sample_44kH.wav");
+  semitone_ration = 1.059463094;
+  L = length(audio_content);
+  loop_point_44kH = 9591;
+
+  % generare la quinta con signal reconstruction
+  % il risultato e' molto buono in realta' considerando che c'e' solamente
+  % un signal reconstruction algorithm stupidissimo senza filtri ne niente
+
+  fifth_ratio = semitone_ration ^ 5;
+  % test 1: semplice lookup table
+  fifth_chord = zeros(1, L);
+  for idx = 1:L
+      i = (idx * fifth_ratio);
+      if i > loop_point_44kH
+          i = mod(i, L - loop_point_44kH) + (loop_point_44kH);
+      end
+      fifth_chord(idx) = audio_content(round(i));
+  end
+
+  audiowrite("signal_reconstruction_experiment/fifth.wav", fifth_chord,
+  sampl_freq);
+
+  % resampling a 12kHz
+  % ok questo fa una cosa diversa
+  % resampled = resample(fifth_chord, sampl_freq, 12000);
+  % audiowrite("signal_reconstruction_experiment/fifth_resampled.wav",
+  resampled, ... % 12000);
+*/
+void change_semitone(int16_t *current_note, int dsem) {
+  double ratio = dsem * SEMITONE_RATIO;
+  for (size_t idx = 0; idx < CURRENT_NOTE_LENGTH; idx++) {
+    size_t i = (size_t)trunc(idx * ratio);
+    if (i > 9591U) {
+      i = (i % SAMPLE_44KHZ_SIZE - SAMPLE_44KHZ_LOOP_POINT) +
+          (SAMPLE_44KHZ_LOOP_POINT);
+    }
+    current_note[idx] = sample_44kHz[i];
   }
 }
 
@@ -188,17 +237,33 @@ int main(void) {
 #ifdef TEST_INTERRUPTS
   uint32_t firstts = HAL_GetTick();
 #endif
+
+  int16_t current_note_s[CURRENT_NOTE_LENGTH];
+  change_semitone(current_note_s, 5);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+
+#if 0
     if (dma_completed) {
       dma_completed = false;
-      HAL_SAI_Transmit_DMA(&hsai_BlockA1, (uint16_t *)sample_44kHz,
-                           SAMPLE_44KHZ_SIZE);
+      volatile HAL_StatusTypeDef trasmit_result = HAL_SAI_Transmit_DMA(
+          &hsai_BlockA1, (uint16_t *)sample_44kHz, SAMPLE_44KHZ_SIZE);
+      HAL_UART_Transmit(&huart1, (uint8_t *)"Vabom\r\n", 8, 50);
     }
+#else
 
+    if (sai_it_completed) {
+      sai_it_completed = false;
+      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note_s,
+      // CURRENT_NOTE_LENGTH);
+
+      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t*)sample_long_44kHz,
+      // SAMPLE_LONG_44KHZ_SIZE);
+    }
+#endif
     // HAL_SAI_Transmit(&hsai_BlockA1, (uint16_t *)sample_44kHz,
     // SAMPLE_44KHZ_SIZE, 3000);
 

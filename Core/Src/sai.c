@@ -26,7 +26,7 @@
 /* USER CODE END 0 */
 
 SAI_HandleTypeDef hsai_BlockA1;
-DMA_HandleTypeDef handle_GPDMA1_Channel0;
+DMA_HandleTypeDef handle_GPDMA1_Channel15;
 
 /* SAI1 init function */
 void MX_SAI1_Init(void) {
@@ -45,7 +45,7 @@ void MX_SAI1_Init(void) {
   hsai_BlockA1.Init.OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
   hsai_BlockA1.Init.NoDivider = SAI_MASTERDIVIDER_ENABLE;
   hsai_BlockA1.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
-  hsai_BlockA1.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_44K;
+  hsai_BlockA1.Init.AudioFrequency = SAI_AUDIO_FREQUENCY_22K;
   hsai_BlockA1.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
   hsai_BlockA1.Init.MckOutput = SAI_MCK_OUTPUT_DISABLE;
   hsai_BlockA1.Init.MonoStereoMode = SAI_MONOMODE;
@@ -76,7 +76,7 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
     PeriphClkInit.PLL2.PLL2Source = RCC_PLLSOURCE_MSI;
     PeriphClkInit.PLL2.PLL2M = 3;
     PeriphClkInit.PLL2.PLL2N = 8;
-    PeriphClkInit.PLL2.PLL2P = 2;
+    PeriphClkInit.PLL2.PLL2P = 1;
     PeriphClkInit.PLL2.PLL2Q = 2;
     PeriphClkInit.PLL2.PLL2R = 2;
     PeriphClkInit.PLL2.PLL2RGE = RCC_PLLVCIRANGE_1;
@@ -109,29 +109,29 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
 
     /* Peripheral DMA init*/
 
-    handle_GPDMA1_Channel0.Instance = GPDMA1_Channel0;
-    handle_GPDMA1_Channel0.Init.Request = GPDMA1_REQUEST_SAI1_A;
-    handle_GPDMA1_Channel0.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
-    handle_GPDMA1_Channel0.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    handle_GPDMA1_Channel0.Init.SrcInc = DMA_SINC_FIXED;
-    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_FIXED;
-    handle_GPDMA1_Channel0.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
-    handle_GPDMA1_Channel0.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
-    handle_GPDMA1_Channel0.Init.Priority = DMA_HIGH_PRIORITY;
-    handle_GPDMA1_Channel0.Init.SrcBurstLength = 1;
-    handle_GPDMA1_Channel0.Init.DestBurstLength = 1;
-    handle_GPDMA1_Channel0.Init.TransferAllocatedPort =
-        DMA_SRC_ALLOCATED_PORT0 | DMA_DEST_ALLOCATED_PORT0;
-    handle_GPDMA1_Channel0.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
-    handle_GPDMA1_Channel0.Init.Mode = DMA_NORMAL;
-    if (HAL_DMA_Init(&handle_GPDMA1_Channel0) != HAL_OK) {
+    handle_GPDMA1_Channel15.Instance = GPDMA1_Channel15;
+    handle_GPDMA1_Channel15.Init.Request = GPDMA1_REQUEST_SAI1_A;
+    handle_GPDMA1_Channel15.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
+    handle_GPDMA1_Channel15.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    handle_GPDMA1_Channel15.Init.SrcInc = DMA_SINC_FIXED;
+    handle_GPDMA1_Channel15.Init.DestInc = DMA_DINC_FIXED;
+    handle_GPDMA1_Channel15.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
+    handle_GPDMA1_Channel15.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
+    handle_GPDMA1_Channel15.Init.Priority = DMA_HIGH_PRIORITY;
+    handle_GPDMA1_Channel15.Init.SrcBurstLength = 1;
+    handle_GPDMA1_Channel15.Init.DestBurstLength = 1;
+    handle_GPDMA1_Channel15.Init.TransferAllocatedPort =
+        DMA_SRC_ALLOCATED_PORT0 | DMA_DEST_ALLOCATED_PORT1;
+    handle_GPDMA1_Channel15.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
+    handle_GPDMA1_Channel15.Init.Mode = DMA_NORMAL;
+    if (HAL_DMA_Init(&handle_GPDMA1_Channel15) != HAL_OK) {
       Error_Handler();
     }
 
-    __HAL_LINKDMA(saiHandle, hdmatx, handle_GPDMA1_Channel0);
+    __HAL_LINKDMA(saiHandle, hdmatx, handle_GPDMA1_Channel15);
 
-    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel0,
-                                        DMA_CHANNEL_NPRIV) != HAL_OK) {
+    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel15,
+                                        DMA_CHANNEL_PRIV) != HAL_OK) {
       Error_Handler();
     }
   }
