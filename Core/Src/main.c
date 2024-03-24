@@ -238,8 +238,8 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
-  int16_t current_note_s[CURRENT_NOTE_LENGTH];
-  change_semitone(current_note_s, 5);
+  int16_t current_note[CURRENT_NOTE_LENGTH];
+  change_semitone(current_note, 5);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -257,8 +257,7 @@ int main(void) {
 
     if (sai_it_completed) {
       sai_it_completed = false;
-      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note_s,
-      // CURRENT_NOTE_LENGTH);
+      HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note, CURRENT_NOTE_LENGTH);
 
       // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t*)sample_long_44kHz,
       // SAMPLE_LONG_44KHZ_SIZE);
