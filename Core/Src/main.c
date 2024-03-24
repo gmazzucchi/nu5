@@ -33,6 +33,8 @@
 /* USER CODE BEGIN Includes */
 
 #include "arm_math.h"
+#include "midi.h"
+#include "tusb.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -183,6 +185,14 @@ void change_semitone(int16_t *current_note, int dsem) {
   }
 }
 
+// MIDI USER FUNCTIONS
+
+void board_led_write(bool led_state) {
+  HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, led_state);
+}
+
+uint32_t board_millis(void) { return HAL_GetTick(); }
+
 /* USER CODE END 0 */
 
 /**
@@ -238,6 +248,12 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
+  bool res = tusb_init();
+  if (!res) {
+    print("TinyUsb initialization failure");
+    Error_Handler();
+  }
+
   int16_t current_note[CURRENT_NOTE_LENGTH];
   change_semitone(current_note, 5);
   /* USER CODE END 2 */
@@ -255,9 +271,14 @@ int main(void) {
     }
 #else
 
+    tud_task(); // device task
+    led_blinking_task();
+    midi_task();
+
     if (sai_it_completed) {
       sai_it_completed = false;
-      HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note, CURRENT_NOTE_LENGTH);
+      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note,
+      // CURRENT_NOTE_LENGTH);
 
       // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t*)sample_long_44kHz,
       // SAMPLE_LONG_44KHZ_SIZE);

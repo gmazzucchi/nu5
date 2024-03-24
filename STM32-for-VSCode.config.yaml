@@ -77,7 +77,8 @@ includeDirectories:
   - Src/**
   - Drivers/CMSIS/DSP/Include/
   - Core/Src/**
-  - Core/Lib/**
+  - Core/Lib/tinyusb/src/
+  - Core/Lib/tinyusb/hw
 
 
 # Files that should be included in the compilation.
@@ -88,7 +89,7 @@ includeDirectories:
 sourceFiles:  
   - Src/**
   - Core/Src/**
-  - Core/Lib/**
+  - Core/Lib/tinyusb/src/**/*.c
 
 
 # When no makefile is present it will show a warning pop-up.
