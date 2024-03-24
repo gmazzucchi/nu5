@@ -23,10 +23,10 @@
  *
  */
 
-#include "midi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pedalinator_midi.h"
 
 #include "bsp/board_api.h"
 #include "tusb.h"
@@ -50,7 +50,7 @@
  * - 2500 ms : device is suspended
  */
 enum {
-  BLINK_NOT_MOUNTED = 250,
+  BLINK_NOT_MOUNTED = 50,
   BLINK_MOUNTED = 1000,
   BLINK_SUSPENDED = 2500,
 };

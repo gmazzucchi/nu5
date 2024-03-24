@@ -33,7 +33,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "arm_math.h"
-#include "midi.h"
+#include "pedalinator_midi.h"
 #include "tusb.h"
 #include <stdbool.h>
 #include <stdio.h>
