@@ -33,6 +33,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "arm_math.h"
+#include "math.h"
 #include "pedalinator_midi.h"
 #include "tusb.h"
 #include <stdbool.h>
@@ -141,6 +142,30 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
   }
 }
 
+const char falling_message[] = "falling interrupts enabled\r\n";
+const char rising_message[] = "rising interrupts enabled\r\n";
+const char enable_it_msg[] = "enabling interrupts\r\n";
+const char disable_it_msg[] = "disabling interrupts\r\n";
+
+bool semitone_up = false;
+
+void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == USER_BUTTON_Pin) {
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);
+    HAL_UART_Transmit(&huart1, (uint8_t *)falling_message,
+                      sizeof(falling_message), 100);
+  }
+}
+
+void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == USER_BUTTON_Pin) {
+    semitone_up = true;
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    HAL_UART_Transmit(&huart1, (uint8_t *)rising_message,
+                      sizeof(rising_message), 100);
+  }
+}
+
 #define SEMITONE_RATIO 1.059463094
 
 /*
@@ -178,12 +203,14 @@ void change_semitone(int16_t *current_note, int dsem) {
   for (size_t idx = 0; idx < CURRENT_NOTE_LENGTH; idx++) {
     size_t i = (size_t)trunc(idx * ratio);
     if (i > 9591U) {
-      i = (i % SAMPLE_44KHZ_SIZE - SAMPLE_44KHZ_LOOP_POINT) +
-          (SAMPLE_44KHZ_LOOP_POINT);
+      i = (i % SAMPLE_22KHZ5_SIZE - SAMPLE_22KHZ5_LOOP_POINT) +
+          (SAMPLE_22KHZ5_LOOP_POINT);
     }
-    current_note[idx] = sample_44kHz[i];
+    current_note[idx] = sample_22kHz5[i];
   }
 }
+
+void build_chord(int16_t *base_note, uint8_t *semitones, size_t n_notes) {}
 
 // MIDI USER FUNCTIONS
 
@@ -254,8 +281,53 @@ int main(void) {
     Error_Handler();
   }
 
-  int16_t current_note[CURRENT_NOTE_LENGTH];
-  change_semitone(current_note, 5);
+  /*
+    Somewhat it does not work
+
+    // bool active_framebuffer = false;
+    int16_t current_note[CURRENT_NOTE_LENGTH];
+    int16_t accordo[CURRENT_NOTE_LENGTH];
+
+    memcpy(current_note, sample_22kHz5, CURRENT_NOTE_LENGTH * sizeof(int16_t));
+    memcpy(accordo, sample_22kHz5, CURRENT_NOTE_LENGTH * sizeof(int16_t));
+
+    change_semitone(current_note, 1);
+    change_semitone(accordo, 4);
+
+    for (size_t idx = 0; idx < CURRENT_NOTE_LENGTH; idx++) {
+      accordo[idx] += current_note[idx];
+    }
+
+    // memcpy(current_note, sample_44kHz, CURRENT_NOTE_LENGTH *
+    sizeof(int16_t));
+    // change_semitone(current_note, 1);
+   */
+
+/***
+ * Allora, va ma si sente lo scattino in mezzo, ed e' proprio il passaggio, non
+ *
+ * A * exp(-t / TAU)
+ */
+#define CORPO_L ((SAMPLE_22KHZ5_SIZE - SAMPLE_22KHZ5_LOOP_POINT) * 2)
+  int16_t attacco[SAMPLE_22KHZ5_LOOP_POINT] = {0};
+  int16_t corpo[CORPO_L] = {0};
+  int16_t decay[CORPO_L / 2] = {0};
+  double TAU = ((double)CORPO_L) / 15.0; // log(200)
+
+  for (size_t idx = 0; idx < SAMPLE_22KHZ5_SIZE; idx++) {
+    int16_t val = sample_22kHz5[idx];
+    if (idx < SAMPLE_22KHZ5_LOOP_POINT) {
+      attacco[idx] = val;
+    } else {
+      size_t jidx = idx - SAMPLE_22KHZ5_LOOP_POINT;
+      corpo[jidx] = val;
+      corpo[(CORPO_L / 2) + (jidx)] = val;
+      decay[jidx] =
+          val *
+          exp(-(jidx / TAU)); // val / ((idx - SAMPLE_22KHZ5_LOOP_POINT) + 1);
+    }
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -275,17 +347,35 @@ int main(void) {
     led_blinking_task();
     midi_task();
 
+    if (semitone_up) {
+      // active_framebuffer = !active_framebuffer;
+      // change_semitone(current_note[active_framebuffer], 1);
+      semitone_up = false;
+    }
+
+    if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+        GPIO_PIN_SET) {
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco,
+                       SAMPLE_22KHZ5_LOOP_POINT, 3000);
+      while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+             GPIO_PIN_SET) {
+        HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)corpo, CORPO_L, 3000);
+      }
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, CORPO_L / 2, 3000);
+    }
+
     if (sai_it_completed) {
-      sai_it_completed = false;
-      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t *)current_note,
+      // sai_it_completed = false;
+      // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint8_t *)accordo,
       // CURRENT_NOTE_LENGTH);
 
       // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t*)sample_long_44kHz,
       // SAMPLE_LONG_44KHZ_SIZE);
     }
 #endif
-    // HAL_SAI_Transmit(&hsai_BlockA1, (uint16_t *)sample_44kHz,
-    // SAMPLE_44KHZ_SIZE, 3000);
+    // HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)sample_22kHz5,
+    // CURRENT_NOTE_LENGTH, 3000); HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t
+    // *)corpo2, CORPO_L * 2, 3000);
 
 #ifdef TEST_INTERRUPTS
     while (HAL_GetTick() - firstts < 3000)

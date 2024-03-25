@@ -23,10 +23,10 @@
  *
  */
 
+#include "pedalinator_midi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pedalinator_midi.h"
 
 #include "bsp/board_api.h"
 #include "tusb.h"
