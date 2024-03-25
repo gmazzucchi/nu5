@@ -198,16 +198,13 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   % audiowrite("signal_reconstruction_experiment/fifth_resampled.wav",
   resampled, ... % 12000);
 */
-void change_semitone(int16_t *current_note, int dsem) {
-  double ratio = dsem * SEMITONE_RATIO;
-  for (size_t idx = 0; idx < CURRENT_NOTE_LENGTH; idx++) {
-    size_t i = (size_t)trunc(idx * ratio);
-    if (i > 9591U) {
-      i = (i % SAMPLE_22KHZ5_SIZE - SAMPLE_22KHZ5_LOOP_POINT) +
-          (SAMPLE_22KHZ5_LOOP_POINT);
-    }
-    current_note[idx] = sample_22kHz5[i];
-  }
+int change_semitone(int16_t *curr_n, size_t curr_n_size, int16_t* base_n, size_t base_n_size, int dsem) {
+  if (curr_n_size > base_n_size)
+    return -1;
+  double ratio = pow(SEMITONE_RATIO, dsem);
+  for (size_t idx = 0; idx < curr_n_size; idx++)
+    curr_n[idx] = base_n[(size_t)round(idx * ratio)];
+  return curr_n_size;
 }
 
 void build_chord(int16_t *base_note, uint8_t *semitones, size_t n_notes) {}
@@ -303,31 +300,43 @@ int main(void) {
     // change_semitone(current_note, 1);
    */
 
+
+#ifdef PLAY_NOTE
 /***
- * Allora, va ma si sente lo scattino in mezzo, ed e' proprio il passaggio, non
- *
  * A * exp(-t / TAU)
  */
+#define ATTACCO_L (SAMPLE_22KHZ5_LOOP_POINT)
 #define CORPO_L ((SAMPLE_22KHZ5_SIZE - SAMPLE_22KHZ5_LOOP_POINT) * 2)
-  int16_t attacco[SAMPLE_22KHZ5_LOOP_POINT] = {0};
+#define DECAY_L (CORPO_L / 2)
+
+
+  int16_t attacco[ATTACCO_L] = {0};
   int16_t corpo[CORPO_L] = {0};
-  int16_t decay[CORPO_L / 2] = {0};
+  int16_t decay[DECAY_L] = {0};
   double TAU = ((double)CORPO_L) / 15.0; // log(200)
 
   for (size_t idx = 0; idx < SAMPLE_22KHZ5_SIZE; idx++) {
     int16_t val = sample_22kHz5[idx];
-    if (idx < SAMPLE_22KHZ5_LOOP_POINT) {
+    if (idx < ATTACCO_L) {
       attacco[idx] = val;
     } else {
-      size_t jidx = idx - SAMPLE_22KHZ5_LOOP_POINT;
+      size_t jidx = idx - ATTACCO_L;
       corpo[jidx] = val;
-      corpo[(CORPO_L / 2) + (jidx)] = val;
+      corpo[(DECAY_L) + (jidx)] = val;
       decay[jidx] =
           val *
           exp(-(jidx / TAU)); // val / ((idx - SAMPLE_22KHZ5_LOOP_POINT) + 1);
     }
   }
 
+  int16_t original_attacco[ATTACCO_L] = {0};
+  int16_t original_corpo[CORPO_L] = {0};
+  int16_t original_decay[DECAY_L] = {0};
+
+  memcpy(original_attacco, attacco, ATTACCO_L * sizeof(int16_t));
+  memcpy(original_corpo, corpo, CORPO_L * sizeof(int16_t));
+  memcpy(original_decay, decay, (DECAY_L) * sizeof(int16_t));
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -347,6 +356,7 @@ int main(void) {
     led_blinking_task();
     midi_task();
 
+#ifdef PLAY_NOTE
     if (semitone_up) {
       // active_framebuffer = !active_framebuffer;
       // change_semitone(current_note[active_framebuffer], 1);
@@ -355,13 +365,19 @@ int main(void) {
 
     if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
         GPIO_PIN_SET) {
-      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco,
-                       SAMPLE_22KHZ5_LOOP_POINT, 3000);
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco, ATTACCO_L, 3000);
       while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
              GPIO_PIN_SET) {
         HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)corpo, CORPO_L, 3000);
       }
-      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, CORPO_L / 2, 3000);
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, DECAY_L, 3000);
+
+      change_semitone(attacco, ATTACCO_L, original_attacco, ATTACCO_L, 1); 
+      change_semitone(corpo, CORPO_L, original_corpo, CORPO_L, 1); 
+      change_semitone(decay, DECAY_L, original_decay, DECAY_L, 1);
+      memcpy(original_attacco, attacco, ATTACCO_L * sizeof(int16_t));
+      memcpy(original_corpo, corpo, CORPO_L * sizeof(int16_t));
+      memcpy(original_decay, decay, (DECAY_L) * sizeof(int16_t));  
     }
 
     if (sai_it_completed) {
@@ -376,6 +392,7 @@ int main(void) {
     // HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)sample_22kHz5,
     // CURRENT_NOTE_LENGTH, 3000); HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t
     // *)corpo2, CORPO_L * 2, 3000);
+#endif
 
 #ifdef TEST_INTERRUPTS
     while (HAL_GetTick() - firstts < 3000)
