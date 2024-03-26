@@ -77,6 +77,12 @@ void SystemClock_Config(void);
 // #define TEST_SWITCH
 // #define TEST_INTERRUPTS
 // #define TEST_TIMER
+#define PEDALINATOR_USB_MIDI 0
+
+#if PEDALINATOR_USB_MIDI == 1
+#else
+#include "usb_audio_test.h"
+#endif
 
 #ifdef TEST_INTERRUPTS
 const char falling_message[] = "falling interrupts enabled\n";
@@ -198,7 +204,8 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   % audiowrite("signal_reconstruction_experiment/fifth_resampled.wav",
   resampled, ... % 12000);
 */
-int change_semitone(int16_t *curr_n, size_t curr_n_size, int16_t* base_n, size_t base_n_size, int dsem) {
+int change_semitone(int16_t *curr_n, size_t curr_n_size, int16_t *base_n,
+                    size_t base_n_size, int dsem) {
   if (curr_n_size > base_n_size)
     return -1;
   double ratio = pow(SEMITONE_RATIO, dsem);
@@ -272,11 +279,22 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
+#if PEDALINATOR_USB_MIDI == 1
   bool res = tusb_init();
   if (!res) {
     print("TinyUsb initialization failure");
     Error_Handler();
   }
+#else
+  // init device stack on configured roothub port
+  tud_init(BOARD_TUD_RHPORT);
+  // Init values
+  sampFreq = AUDIO_SAMPLE_RATE;
+  clkValid = 1;
+
+  init_robo_del_coso();
+
+#endif
 
   /*
     Somewhat it does not work
@@ -300,7 +318,6 @@ int main(void) {
     // change_semitone(current_note, 1);
    */
 
-
 #ifdef PLAY_NOTE
 /***
  * A * exp(-t / TAU)
@@ -308,7 +325,6 @@ int main(void) {
 #define ATTACCO_L (SAMPLE_22KHZ5_LOOP_POINT)
 #define CORPO_L ((SAMPLE_22KHZ5_SIZE - SAMPLE_22KHZ5_LOOP_POINT) * 2)
 #define DECAY_L (CORPO_L / 2)
-
 
   int16_t attacco[ATTACCO_L] = {0};
   int16_t corpo[CORPO_L] = {0};
@@ -343,18 +359,15 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
 
-#if 0
-    if (dma_completed) {
-      dma_completed = false;
-      volatile HAL_StatusTypeDef trasmit_result = HAL_SAI_Transmit_DMA(
-          &hsai_BlockA1, (uint16_t *)sample_44kHz, SAMPLE_44KHZ_SIZE);
-      HAL_UART_Transmit(&huart1, (uint8_t *)"Vabom\r\n", 8, 50);
-    }
-#else
-
+#if PEDALINATOR_USB_MIDI == 1
     tud_task(); // device task
     led_blinking_task();
     midi_task();
+#else
+    tud_task(); // tinyusb device task
+    led_blinking_task();
+    audio_task();
+#endif
 
 #ifdef PLAY_NOTE
     if (semitone_up) {
@@ -372,12 +385,12 @@ int main(void) {
       }
       HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, DECAY_L, 3000);
 
-      change_semitone(attacco, ATTACCO_L, original_attacco, ATTACCO_L, 1); 
-      change_semitone(corpo, CORPO_L, original_corpo, CORPO_L, 1); 
+      change_semitone(attacco, ATTACCO_L, original_attacco, ATTACCO_L, 1);
+      change_semitone(corpo, CORPO_L, original_corpo, CORPO_L, 1);
       change_semitone(decay, DECAY_L, original_decay, DECAY_L, 1);
       memcpy(original_attacco, attacco, ATTACCO_L * sizeof(int16_t));
       memcpy(original_corpo, corpo, CORPO_L * sizeof(int16_t));
-      memcpy(original_decay, decay, (DECAY_L) * sizeof(int16_t));  
+      memcpy(original_decay, decay, (DECAY_L) * sizeof(int16_t));
     }
 
     if (sai_it_completed) {
@@ -388,10 +401,6 @@ int main(void) {
       // HAL_SAI_Transmit_IT(&hsai_BlockA1, (uint16_t*)sample_long_44kHz,
       // SAMPLE_LONG_44KHZ_SIZE);
     }
-#endif
-    // HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)sample_22kHz5,
-    // CURRENT_NOTE_LENGTH, 3000); HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t
-    // *)corpo2, CORPO_L * 2, 3000);
 #endif
 
 #ifdef TEST_INTERRUPTS

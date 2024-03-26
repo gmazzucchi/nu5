@@ -23,6 +23,8 @@
  *
  */
 
+#if 0
+
 #include "pedalinator_midi.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -171,3 +173,5 @@ void led_blinking_task(void) {
   board_led_write(led_state);
   led_state = 1 - led_state; // toggle
 }
+
+#endif
