@@ -34,8 +34,6 @@
 
 #include "arm_math.h"
 #include "math.h"
-#include "pedalinator_midi.h"
-#include "tusb.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -77,12 +75,6 @@ void SystemClock_Config(void);
 // #define TEST_SWITCH
 // #define TEST_INTERRUPTS
 // #define TEST_TIMER
-#define PEDALINATOR_USB_MIDI 0
-
-#if PEDALINATOR_USB_MIDI == 1
-#else
-#include "usb_audio_test.h"
-#endif
 
 #ifdef TEST_INTERRUPTS
 const char falling_message[] = "falling interrupts enabled\n";
@@ -279,23 +271,6 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
-#if PEDALINATOR_USB_MIDI == 1
-  bool res = tusb_init();
-  if (!res) {
-    print("TinyUsb initialization failure");
-    Error_Handler();
-  }
-#else
-  // init device stack on configured roothub port
-  tud_init(BOARD_TUD_RHPORT);
-  // Init values
-  sampFreq = AUDIO_SAMPLE_RATE;
-  clkValid = 1;
-
-  init_robo_del_coso();
-
-#endif
-
   /*
     Somewhat it does not work
 
@@ -358,16 +333,6 @@ int main(void) {
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-
-#if PEDALINATOR_USB_MIDI == 1
-    tud_task(); // device task
-    led_blinking_task();
-    midi_task();
-#else
-    tud_task(); // tinyusb device task
-    led_blinking_task();
-    audio_task();
-#endif
 
 #ifdef PLAY_NOTE
     if (semitone_up) {
