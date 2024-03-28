@@ -32,6 +32,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "all_samples.h"
+
 #include "arm_math.h"
 #include "math.h"
 #include "pedalinator_config.h"
@@ -161,6 +163,8 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
   }
 }
 
+#ifdef PEDALINATOR_PITCH_MODULATION
+
 /*
   [audio_content, sampl_freq] = audioread("sample_44kH.wav");
   semitone_ration = 1.059463094;
@@ -193,12 +197,24 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
 */
 
 /***
-  * This version works well with 1 semitone increase but already with 2 semitone increase it gives distortion
-*/
+ * This version works well with 1 semitone increase but already with 2 semitone
+ * increase it gives distortion.
+ * TODO: Idea. Divide the sample in attacco and corpo and then try to prolong
+ * the corpo only.
+ *
+ * IMPORTANT: Technically the loop point has both a start and a finish, so make
+ * sure that both of them are present!!!! Here only the starting point is
+ * considered and the ending point is used
+ */
 
-int change_semitone(int16_t* current_note, size_t*current_note_len, int16_t* current_note_old, size_t* current_note_old_len, uint8_t dsem, size_t* attacco_len, size_t* corpo_len, size_t* decay_len, size_t* loop_point) {
-  long double ratio = powl(SEMITONE_RATIO, (long double) dsem);
-  // *current_note_old_len = (size_t)(((long double)*current_note_old_len) / ratio);
+int change_semitone(int16_t *current_note, size_t *current_note_len,
+                    int16_t *current_note_old, size_t *current_note_old_len,
+                    uint8_t dsem, size_t *attacco_len, size_t *corpo_len,
+                    size_t *decay_len, size_t *loop_point) {
+  // powl();
+  double ratio = pow(2.0, (dsem / 12.0));
+  // *current_note_old_len = (size_t)(((long double)*current_note_old_len) /
+  // ratio);
   *current_note_len = (size_t)(((long double)*current_note_len) / ratio);
   *attacco_len = (size_t)(((long double)*attacco_len) / ratio);
   *corpo_len = (size_t)(((long double)*corpo_len) / ratio);
@@ -211,38 +227,44 @@ int change_semitone(int16_t* current_note, size_t*current_note_len, int16_t* cur
   size_t c_corpo_len = *corpo_len;
   size_t c_decay_len = *decay_len;
   // size_t c_loop_point = *loop_point;
-  if (c_current_note_len > MAX_CURRENT_NOTE_L || c_attacco_len > MAX_ATTACCO_L || c_corpo_len > MAX_CORPO_L || c_decay_len > MAX_DECAY_L) {
+  if (c_current_note_len > MAX_CURRENT_NOTE_L ||
+      c_attacco_len > MAX_ATTACCO_L || c_corpo_len > MAX_CORPO_L ||
+      c_decay_len > MAX_DECAY_L) {
     return -1;
   }
   if (c_current_note_len > c_current_note_old_len)
     return -1;
-  
+
   for (size_t iattacco = 0; iattacco < c_attacco_len; iattacco++) {
     double x = (iattacco * ratio);
     double y = x - (int)x;
     size_t z = (size_t)x % (c_attacco_len);
-    current_note[iattacco] = current_note_old[z] * (1 - y) + current_note_old[(z + 1) % c_attacco_len] * y;
+    current_note[iattacco] = current_note_old[z] * (1 - y) +
+                             current_note_old[(z + 1) % c_attacco_len] * y;
   }
 
   for (size_t icorpo = 0; icorpo < c_corpo_len; icorpo++) {
     double x = (icorpo * ratio);
     double y = x - (int)x;
     size_t z = (size_t)x % (c_corpo_len);
-    current_note[icorpo + c_attacco_len] = current_note_old[z + c_attacco_len] * (1 - y) + current_note_old[((z + 1) % c_corpo_len) + c_attacco_len] * y;
+    current_note[icorpo + c_attacco_len] =
+        current_note_old[z + c_attacco_len] * (1 - y) +
+        current_note_old[((z + 1) % c_corpo_len) + c_attacco_len] * y;
   }
-  
-  
+
   /* // The original one
   for (size_t idx = 0; idx < c_current_note_len; idx++) {
     double x = (idx * ratio);
     double y = x - (int)x;
     size_t z = (size_t)x % (c_current_note_len);
-    current_note[idx] = current_note_old[z] * (1 - y) + current_note_old[(z + 1) % c_current_note_len] * y;
+    current_note[idx] = current_note_old[z] * (1 - y) + current_note_old[(z + 1)
+  % c_current_note_len] * y;
   }
    */
   *current_note_old_len = c_current_note_len;
   return c_current_note_len;
 }
+#endif
 
 /* int ottava_sopra(int16_t *curr_n, size_t curr_n_size, int16_t *base_n,
                  size_t base_n_size, int dsem) {
@@ -285,6 +307,41 @@ size_t base_n_size) { if (decay_n_size >= base_n_size) { return -1;
  */
 
 void build_chord(int16_t *base_note, uint8_t *semitones, size_t n_notes) {}
+
+/***
+ * TODO: setup a basic system to play all notes
+ * check if the ram is enough
+*/
+
+int16_t *attacchi[PEDALINATOR_N_NOTES] = {
+    sample_C1_22kHz_attacco,       sample_C_sharp1_22kHz_attacco,
+    sample_D1_22kHz_attacco,       sample_Eb1_22kHz_attacco,
+    sample_E1_22kHz_attacco,       sample_F1_22kHz_attacco,
+    sample_F_sharp1_22kHz_attacco, sample_G1_22kHz_attacco,
+    sample_G_sharp1_22kHz_attacco, sample_A1_22kHz_attacco,
+    sample_Bb1_22kHz_attacco,      sample_B1_22kHz_attacco,
+    sample_C2_22kHz_attacco,       sample_C_sharp2_22kHz_attacco,
+    sample_D2_22kHz_attacco,       sample_Eb2_22kHz_attacco,
+    sample_E2_22kHz_attacco,       sample_F2_22kHz_attacco,
+    sample_F_sharp2_22kHz_attacco, sample_G2_22kHz_attacco,
+    sample_G_sharp2_22kHz_attacco, sample_A2_22kHz_attacco,
+    sample_Bb2_22kHz_attacco,      sample_B2_22kHz_attacco,
+    sample_C3_22kHz_attacco};
+
+int16_t *corpi[PEDALINATOR_N_NOTES] = {
+    sample_C1_22kHz_corpo,       sample_C_sharp1_22kHz_corpo,
+    sample_D1_22kHz_corpo,       sample_Eb1_22kHz_corpo,
+    sample_E1_22kHz_corpo,       sample_F1_22kHz_corpo,
+    sample_F_sharp1_22kHz_corpo, sample_G1_22kHz_corpo,
+    sample_G_sharp1_22kHz_corpo, sample_A1_22kHz_corpo,
+    sample_Bb1_22kHz_corpo,      sample_B1_22kHz_corpo,
+    sample_C2_22kHz_corpo,       sample_C_sharp2_22kHz_corpo,
+    sample_D2_22kHz_corpo,       sample_Eb2_22kHz_corpo,
+    sample_E2_22kHz_corpo,       sample_F2_22kHz_corpo,
+    sample_F_sharp2_22kHz_corpo, sample_G2_22kHz_corpo,
+    sample_G_sharp2_22kHz_corpo, sample_A2_22kHz_corpo,
+    sample_Bb2_22kHz_corpo,      sample_B2_22kHz_corpo,
+    sample_C3_22kHz_corpo};
 
 // MIDI USER FUNCTIONS
 
@@ -349,36 +406,13 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
-  /*
-    Somewhat it does not work
-
-    // bool active_framebuffer = false;
-    int16_t current_note[CURRENT_NOTE_LENGTH];
-    int16_t accordo[CURRENT_NOTE_LENGTH];
-
-    memcpy(current_note, sample_22kHz5, CURRENT_NOTE_LENGTH * sizeof(int16_t));
-    memcpy(accordo, sample_22kHz5, CURRENT_NOTE_LENGTH * sizeof(int16_t));
-
-    change_semitone(current_note, 1);
-    change_semitone(accordo, 4);
-
-    for (size_t idx = 0; idx < CURRENT_NOTE_LENGTH; idx++) {
-      accordo[idx] += current_note[idx];
-    }
-
-    // memcpy(current_note, sample_44kHz, CURRENT_NOTE_LENGTH *
-    sizeof(int16_t));
-    // change_semitone(current_note, 1);
-   */
-
-  
-
-#ifdef PLAY_NOTE
   int16_t attacco[MAX_ATTACCO_L] = {0};
   int16_t corpo[MAX_CORPO_L] = {0};
   int16_t decay[MAX_DECAY_L] = {0};
   int16_t current_note[MAX_CURRENT_NOTE_L] = {0};
   int16_t current_note_old[MAX_CURRENT_NOTE_L] = {0};
+
+
 
   size_t attacco_len = BASE_ATTACCO_L;
   size_t corpo_len = BASE_CORPO_L;
@@ -391,11 +425,15 @@ int main(void) {
   memcpy(current_note, sample_22kHz5, sizeof(int16_t) * SAMPLE_22KHZ5_SIZE);
   memcpy(current_note_old, sample_22kHz5, sizeof(int16_t) * SAMPLE_22KHZ5_SIZE);
 
-  print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, current_note_len=%lu, current_note_old_len=%lu\r\n", attacco_len, corpo_len, decay_len, current_note_len, current_note_old_len);
+  print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, current_note_len=%lu, "
+        "current_note_old_len=%lu\r\n",
+        attacco_len, corpo_len, decay_len, current_note_len,
+        current_note_old_len);
 
   elaborate_note_components(current_note, current_note_len, attacco,
                             attacco_len, corpo, corpo_len, decay, decay_len);
   int sem_add = 1;
+
 
 #endif
   /* USER CODE END 2 */
@@ -404,7 +442,7 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
 
-#ifdef PLAY_NOTE
+#ifdef PEDALINATOR_PITCH_MODULATION
     if (semitone_up) {
       // active_framebuffer = !active_framebuffer;
       // change_semitone(current_note[active_framebuffer], 1);
@@ -420,19 +458,61 @@ int main(void) {
       }
       HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, decay_len, 3000);
 
-      int res = change_semitone(current_note, &current_note_len, current_note_old, &current_note_old_len, sem_add, &attacco_len, &corpo_len, &decay_len, &loop_point);
+      int res =
+          change_semitone(current_note, &current_note_len, current_note_old,
+                          &current_note_old_len, sem_add, &attacco_len,
+                          &corpo_len, &decay_len, &loop_point);
       ++sem_add;
       if (res < 0) {
         HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
         Error_Handler();
       }
-      res = elaborate_note_components(current_note, current_note_len, attacco, attacco_len, corpo, corpo_len, decay, decay_len);
+      res = elaborate_note_components(current_note, current_note_len, attacco,
+                                      attacco_len, corpo, corpo_len, decay,
+                                      decay_len);
       if (res < 0) {
         HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
         Error_Handler();
       }
-      // memcpy(current_note_old, current_note, sizeof(int16_t) * current_note_len);
-      print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, current_note_len=%lu, current_note_old_len=%lu\r\n", attacco_len, corpo_len, decay_len, current_note_len, current_note_old_len);
+      // memcpy(current_note_old, current_note, sizeof(int16_t) *
+      // current_note_len);
+      print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, "
+            "current_note_len=%lu, current_note_old_len=%lu\r\n",
+            attacco_len, corpo_len, decay_len, current_note_len,
+            current_note_old_len);
+    }
+#else
+    if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+        GPIO_PIN_SET) {
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco, attacco_len, 3000);
+      while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+             GPIO_PIN_SET) {
+        HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)corpo, corpo_len, 3000);
+      }
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, decay_len, 3000);
+
+      int res =
+          change_semitone(current_note, &current_note_len, current_note_old,
+                          &current_note_old_len, sem_add, &attacco_len,
+                          &corpo_len, &decay_len, &loop_point);
+      ++sem_add;
+      if (res < 0) {
+        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        Error_Handler();
+      }
+      res = elaborate_note_components(current_note, current_note_len, attacco,
+                                      attacco_len, corpo, corpo_len, decay,
+                                      decay_len);
+      if (res < 0) {
+        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        Error_Handler();
+      }
+      // memcpy(current_note_old, current_note, sizeof(int16_t) *
+      // current_note_len);
+      print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, "
+            "current_note_len=%lu, current_note_old_len=%lu\r\n",
+            attacco_len, corpo_len, decay_len, current_note_len,
+            current_note_old_len);
     }
 #endif
 
