@@ -135,7 +135,9 @@ void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
 }
 void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
   if (hsai == &hsai_BlockA1) {
-    HAL_UART_Transmit(&huart1, (uint8_t *)"Va Male\r\n", 10, 50);
+    while (1) {
+      HAL_UART_Transmit(&huart1, (uint8_t *)"SAI peripheral ERROR\r\n", 23, 50);
+    }
   }
 }
 
@@ -207,25 +209,25 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin) {
  * considered and the ending point is used
  */
 
-int change_semitone(int16_t *current_note, size_t *current_note_len,
-                    int16_t *current_note_old, size_t *current_note_old_len,
-                    uint8_t dsem, size_t *attacco_len, size_t *corpo_len,
-                    size_t *decay_len, size_t *loop_point) {
+int change_semitone(int16_t *current_note, size_t current_note_len,
+                    int16_t *current_note_old, size_t current_note_old_len,
+                    uint8_t dsem, size_t attacco_len, size_t corpo_len,
+                    size_t decay_len, size_t loop_point) {
   // powl();
   double ratio = pow(2.0, (dsem / 12.0));
   // *current_note_old_len = (size_t)(((long double)*current_note_old_len) /
   // ratio);
-  *current_note_len = (size_t)(((long double)*current_note_len) / ratio);
-  *attacco_len = (size_t)(((long double)*attacco_len) / ratio);
-  *corpo_len = (size_t)(((long double)*corpo_len) / ratio);
-  *decay_len = (size_t)(((long double)*decay_len) / ratio);
-  *loop_point = (size_t)(((long double)*loop_point) / ratio);
+  size_t c_current_note_len = (size_t)(((long double)current_note_len) / ratio);
+  size_t c_attacco_len = (size_t)(((long double)attacco_len) / ratio);
+  size_t c_corpo_len = (size_t)(((long double)corpo_len) / ratio);
+  size_t c_decay_len = (size_t)(((long double)decay_len) / ratio);
+  // size_t c_loop_point = (size_t)(((long double)loop_point) / ratio);
+  size_t c_current_note_old_len = current_note_old_len;
 
-  size_t c_current_note_old_len = *current_note_old_len;
-  size_t c_current_note_len = *current_note_len;
-  size_t c_attacco_len = *attacco_len;
-  size_t c_corpo_len = *corpo_len;
-  size_t c_decay_len = *decay_len;
+  // size_t c_current_note_len = *current_note_len;
+  // size_t c_attacco_len = *attacco_len;
+  // size_t c_corpo_len = *corpo_len;
+  // size_t c_decay_len = *decay_len;
   // size_t c_loop_point = *loop_point;
   if (c_current_note_len > MAX_CURRENT_NOTE_L ||
       c_attacco_len > MAX_ATTACCO_L || c_corpo_len > MAX_CORPO_L ||
@@ -235,6 +237,17 @@ int change_semitone(int16_t *current_note, size_t *current_note_len,
   if (c_current_note_len > c_current_note_old_len)
     return -1;
 
+  /*
+      IL = len(corpo_frames)
+      L = math.trunc(len(corpo_frames) / ratio)
+      corpo_frames_2 = [0] * L
+      for i in range(0, L):
+          x = (i * ratio)
+          y = x - math.trunc(x)
+          z = math.trunc(x) % IL
+          corpo_frames_2[i] = corpo_frames[z] * \
+              (1 - y) + corpo_frames[(z + 1) % IL] * y
+  */
   for (size_t iattacco = 0; iattacco < c_attacco_len; iattacco++) {
     double x = (iattacco * ratio);
     double y = x - (int)x;
@@ -261,10 +274,9 @@ int change_semitone(int16_t *current_note, size_t *current_note_len,
   % c_current_note_len] * y;
   }
    */
-  *current_note_old_len = c_current_note_len;
+  // *current_note_old_len = c_current_note_len;
   return c_current_note_len;
 }
-#endif
 
 /* int ottava_sopra(int16_t *curr_n, size_t curr_n_size, int16_t *base_n,
                  size_t base_n_size, int dsem) {
@@ -307,6 +319,7 @@ size_t base_n_size) { if (decay_n_size >= base_n_size) { return -1;
  */
 
 void build_chord(int16_t *base_note, uint8_t *semitones, size_t n_notes) {}
+#endif
 
 #ifdef PEDALINATOR_ALL_NOTES_STORED
 /***
@@ -388,6 +401,65 @@ void elaborate_decay(int16_t *corpo, size_t corpo_len, int16_t *decay,
   }
 }
 
+#endif
+
+#ifdef PEDALINATOR_ADVANCED_PITCH_MODULATION
+#include "sample_22kHz_D2.h"
+
+/* // WORKING PYTHON ALGORITHM
+ lp = LOOP_POINT_DATA[sample]["lp_start"]
+ls = LOOP_POINT_DATA[sample]["lp_stop"]
+(frames, nframes) = soundfile.read(sample + ".wav")
+attacco_frames = frames[:lp]
+corpo_frames = frames[lp:ls]
+dsem = 4
+ratio = 2**(dsem/12)
+IL = len(corpo_frames)
+L = math.trunc(len(corpo_frames) / ratio)
+corpo_frames_2 = [0] * L
+for i in range(0, L):
+    x = (i * ratio)
+    y = x - math.trunc(x)
+    z = math.trunc(x) % IL
+    corpo_frames_2[i] = corpo_frames[z] * \
+        (1 - y) + corpo_frames[(z + 1) % IL] * y */
+
+int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base,
+                           size_t base_len, int dsem) {
+  if (dsem == 0) {
+    return 0;
+  }
+  double ratio = pow(2.0, dsem / 12.0);
+  size_t L = base_len / ratio;
+  size_t IL = base_len;
+  for (size_t i = 0; i < L; i++) {
+    double x = i * ratio;
+    size_t y = (size_t)x;
+    size_t z = (size_t)x % IL;
+    curr[i] = base[z] * (1 - y) + base[(z + 1) % IL] * y;
+  }
+  return 0;
+}
+
+// returns the new current note length
+size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
+                         size_t base_len, int dsem) {
+  if (dsem == 0) {
+    return 0;
+  }
+  long double ratio = powl(2.0, dsem / 12.0);
+  size_t L = (size_t) ((double)base_len / ratio);
+  if (curr_max_len < L) {
+    Error_Handler();
+  }
+  for (size_t i = 0; i < L; i++) {
+    double x = (double) i * ratio;
+    double y = x - (size_t)x;
+    size_t z = (size_t)x % base_len;
+    curr[i] = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
+  }
+  return L;
+}
 #endif
 
 // MIDI USER FUNCTIONS
@@ -488,6 +560,17 @@ int main(void) {
   int16_t current_decay[30000] = {0};
 #endif
 
+#ifdef PEDALINATOR_ADVANCED_PITCH_MODULATION
+  int dsem = 0;
+  // int16_t c_attacco[];
+#define C_CORPO_MAX_L 50000
+  int16_t c_corpo[C_CORPO_MAX_L] = {0};
+  memcpy(c_corpo, sample_D2_22kHz_corpo,
+         SAMPLE_D2_22KHZ_CORPO_L * sizeof(int16_t));
+  size_t c_corpo_len = SAMPLE_D2_22KHZ_CORPO_L;
+  // int16_t c_decay[];
+#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -510,45 +593,9 @@ int main(void) {
       }
       HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, decay_len, 3000);
 
-      int res =
-          change_semitone(current_note, &current_note_len, current_note_old,
-                          &current_note_old_len, sem_add, &attacco_len,
-                          &corpo_len, &decay_len, &loop_point);
-      ++sem_add;
-      if (res < 0) {
-        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-        Error_Handler();
-      }
-      res = elaborate_note_components(current_note, current_note_len, attacco,
-                                      attacco_len, corpo, corpo_len, decay,
-                                      decay_len);
-      if (res < 0) {
-        HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-        Error_Handler();
-      }
-      // memcpy(current_note_old, current_note, sizeof(int16_t) *
-      // current_note_len);
-      print("attacco_len=%lu, corpo_len=%lu, decay_len=%lu, "
-            "current_note_len=%lu, current_note_old_len=%lu\r\n",
-            attacco_len, corpo_len, decay_len, current_note_len,
-            current_note_old_len);
-    }
-#endif
-
-#ifdef PEDALINATOR_PITCH_MODULATION
-    if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
-        GPIO_PIN_SET) {
-      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco, attacco_len, 3000);
-      while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
-             GPIO_PIN_SET) {
-        HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)corpo, corpo_len, 3000);
-      }
-      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)decay, decay_len, 3000);
-
-      int res =
-          change_semitone(current_note, &current_note_len, current_note_old,
-                          &current_note_old_len, sem_add, &attacco_len,
-                          &corpo_len, &decay_len, &loop_point);
+      int res = change_semitone(current_note, current_note_len,
+                                current_note_old, current_note_old_len, sem_add,
+                                attacco_len, corpo_len, decay_len, loop_point);
       ++sem_add;
       if (res < 0) {
         HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
@@ -588,6 +635,19 @@ int main(void) {
                        corpi_l[cn_idx] / 2, 3000);
       cn_idx++;
       cn_idx %= PEDALINATOR_N_NOTES;
+    }
+#endif
+
+#ifdef PEDALINATOR_ADVANCED_PITCH_MODULATION
+    if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+        GPIO_PIN_SET) {
+      while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+             GPIO_PIN_SET) {
+        HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)c_corpo, c_corpo_len, 10000);
+      }
+      dsem--;
+      c_corpo_len = corpo_pitch_shifting(c_corpo, C_CORPO_MAX_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, dsem);
+      print("c_corpo_len = %lu\r\n", c_corpo_len);
     }
 #endif
 
