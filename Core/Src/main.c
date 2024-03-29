@@ -308,40 +308,87 @@ size_t base_n_size) { if (decay_n_size >= base_n_size) { return -1;
 
 void build_chord(int16_t *base_note, uint8_t *semitones, size_t n_notes) {}
 
+#ifdef PEDALINATOR_ALL_NOTES_STORED
 /***
  * TODO: setup a basic system to play all notes
  * check if the ram is enough
-*/
+ */
+
+size_t attacchi_l[PEDALINATOR_N_NOTES] = {
+    // SAMPLE_C1_22KHZ_ATTACCO_L,       SAMPLE_C_SHARP1_22KHZ_ATTACCO_L,
+    // SAMPLE_D1_22KHZ_ATTACCO_L,       SAMPLE_EB1_22KHZ_ATTACCO_L,
+    SAMPLE_E1_22KHZ_ATTACCO_L,       SAMPLE_F1_22KHZ_ATTACCO_L,
+    SAMPLE_F_SHARP1_22KHZ_ATTACCO_L, SAMPLE_G1_22KHZ_ATTACCO_L,
+    SAMPLE_G_SHARP1_22KHZ_ATTACCO_L, SAMPLE_A1_22KHZ_ATTACCO_L,
+    SAMPLE_BB1_22KHZ_ATTACCO_L,      SAMPLE_B1_22KHZ_ATTACCO_L,
+    /* SAMPLE_C2_22KHZ_ATTACCO_L,       SAMPLE_C_SHARP2_22KHZ_ATTACCO_L,
+    SAMPLE_D2_22KHZ_ATTACCO_L,       SAMPLE_EB2_22KHZ_ATTACCO_L,
+    SAMPLE_E2_22KHZ_ATTACCO_L,       SAMPLE_F2_22KHZ_ATTACCO_L,
+    SAMPLE_F_SHARP2_22KHZ_ATTACCO_L, SAMPLE_G2_22KHZ_ATTACCO_L,
+    SAMPLE_G_SHARP2_22KHZ_ATTACCO_L, SAMPLE_A2_22KHZ_ATTACCO_L,
+    SAMPLE_BB2_22KHZ_ATTACCO_L,      SAMPLE_B2_22KHZ_ATTACCO_L,
+    SAMPLE_C3_22KHZ_ATTACCO_L */
+};
+
+size_t corpi_l[PEDALINATOR_N_NOTES] = {
+    // SAMPLE_C1_22KHZ_CORPO_L,       SAMPLE_C_SHARP1_22KHZ_CORPO_L,
+    // SAMPLE_D1_22KHZ_CORPO_L,       SAMPLE_EB1_22KHZ_CORPO_L,
+    SAMPLE_E1_22KHZ_CORPO_L,       SAMPLE_F1_22KHZ_CORPO_L,
+    SAMPLE_F_SHARP1_22KHZ_CORPO_L, SAMPLE_G1_22KHZ_CORPO_L,
+    SAMPLE_G_SHARP1_22KHZ_CORPO_L, SAMPLE_A1_22KHZ_CORPO_L,
+    SAMPLE_BB1_22KHZ_CORPO_L,      SAMPLE_B1_22KHZ_CORPO_L,
+
+    /* SAMPLE_C2_22KHZ_CORPO_L,       SAMPLE_C_SHARP2_22KHZ_CORPO_L,
+    SAMPLE_D2_22KHZ_CORPO_L,       SAMPLE_EB2_22KHZ_CORPO_L,
+    SAMPLE_E2_22KHZ_CORPO_L,       SAMPLE_F2_22KHZ_CORPO_L,
+    SAMPLE_F_SHARP2_22KHZ_CORPO_L, SAMPLE_G2_22KHZ_CORPO_L,
+    SAMPLE_G_SHARP2_22KHZ_CORPO_L, SAMPLE_A2_22KHZ_CORPO_L,
+    SAMPLE_BB2_22KHZ_CORPO_L,      SAMPLE_B2_22KHZ_CORPO_L,
+    SAMPLE_C3_22KHZ_CORPO_L */
+};
 
 int16_t *attacchi[PEDALINATOR_N_NOTES] = {
-    sample_C1_22kHz_attacco,       sample_C_sharp1_22kHz_attacco,
-    sample_D1_22kHz_attacco,       sample_Eb1_22kHz_attacco,
+    /* sample_C1_22kHz_attacco,       sample_C_sharp1_22kHz_attacco,
+    sample_D1_22kHz_attacco,       sample_Eb1_22kHz_attacco, */
     sample_E1_22kHz_attacco,       sample_F1_22kHz_attacco,
     sample_F_sharp1_22kHz_attacco, sample_G1_22kHz_attacco,
     sample_G_sharp1_22kHz_attacco, sample_A1_22kHz_attacco,
     sample_Bb1_22kHz_attacco,      sample_B1_22kHz_attacco,
-    sample_C2_22kHz_attacco,       sample_C_sharp2_22kHz_attacco,
+    /* sample_C2_22kHz_attacco,       sample_C_sharp2_22kHz_attacco,
     sample_D2_22kHz_attacco,       sample_Eb2_22kHz_attacco,
     sample_E2_22kHz_attacco,       sample_F2_22kHz_attacco,
     sample_F_sharp2_22kHz_attacco, sample_G2_22kHz_attacco,
     sample_G_sharp2_22kHz_attacco, sample_A2_22kHz_attacco,
     sample_Bb2_22kHz_attacco,      sample_B2_22kHz_attacco,
-    sample_C3_22kHz_attacco};
+    sample_C3_22kHz_attacco */
+};
 
 int16_t *corpi[PEDALINATOR_N_NOTES] = {
-    sample_C1_22kHz_corpo,       sample_C_sharp1_22kHz_corpo,
-    sample_D1_22kHz_corpo,       sample_Eb1_22kHz_corpo,
+    // sample_C1_22kHz_corpo,       sample_C_sharp1_22kHz_corpo,
+    // sample_D1_22kHz_corpo,       sample_Eb1_22kHz_corpo,
     sample_E1_22kHz_corpo,       sample_F1_22kHz_corpo,
     sample_F_sharp1_22kHz_corpo, sample_G1_22kHz_corpo,
     sample_G_sharp1_22kHz_corpo, sample_A1_22kHz_corpo,
     sample_Bb1_22kHz_corpo,      sample_B1_22kHz_corpo,
-    sample_C2_22kHz_corpo,       sample_C_sharp2_22kHz_corpo,
+    /* sample_C2_22kHz_corpo,       sample_C_sharp2_22kHz_corpo,
     sample_D2_22kHz_corpo,       sample_Eb2_22kHz_corpo,
     sample_E2_22kHz_corpo,       sample_F2_22kHz_corpo,
     sample_F_sharp2_22kHz_corpo, sample_G2_22kHz_corpo,
     sample_G_sharp2_22kHz_corpo, sample_A2_22kHz_corpo,
     sample_Bb2_22kHz_corpo,      sample_B2_22kHz_corpo,
-    sample_C3_22kHz_corpo};
+    sample_C3_22kHz_corpo */
+};
+
+void elaborate_decay(int16_t *corpo, size_t corpo_len, int16_t *decay,
+                     size_t decay_len) {
+  double TAU = (((double)corpo_len) / 15.0);
+  for (size_t idx = 0; idx < decay_len; idx++) {
+    int16_t val = corpo[idx];
+    decay[idx] = val * exp(-(idx / TAU));
+  }
+}
+
+#endif
 
 // MIDI USER FUNCTIONS
 
@@ -406,13 +453,13 @@ int main(void) {
   uint32_t firstts = HAL_GetTick();
 #endif
 
+#ifdef PEDALINATOR_PITCH_MODULATION
+
   int16_t attacco[MAX_ATTACCO_L] = {0};
   int16_t corpo[MAX_CORPO_L] = {0};
   int16_t decay[MAX_DECAY_L] = {0};
   int16_t current_note[MAX_CURRENT_NOTE_L] = {0};
   int16_t current_note_old[MAX_CURRENT_NOTE_L] = {0};
-
-
 
   size_t attacco_len = BASE_ATTACCO_L;
   size_t corpo_len = BASE_CORPO_L;
@@ -434,8 +481,13 @@ int main(void) {
                             attacco_len, corpo, corpo_len, decay, decay_len);
   int sem_add = 1;
 
-
 #endif
+
+#ifdef PEDALINATOR_ALL_NOTES_STORED
+  int cn_idx = 5;
+  int16_t current_decay[30000] = {0};
+#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -481,7 +533,9 @@ int main(void) {
             attacco_len, corpo_len, decay_len, current_note_len,
             current_note_old_len);
     }
-#else
+#endif
+
+#ifdef PEDALINATOR_PITCH_MODULATION
     if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
         GPIO_PIN_SET) {
       HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacco, attacco_len, 3000);
@@ -513,6 +567,27 @@ int main(void) {
             "current_note_len=%lu, current_note_old_len=%lu\r\n",
             attacco_len, corpo_len, decay_len, current_note_len,
             current_note_old_len);
+    }
+#endif
+
+#ifdef PEDALINATOR_ALL_NOTES_STORED
+    if (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+        GPIO_PIN_SET) {
+
+      elaborate_decay(corpi[cn_idx], corpi_l[cn_idx], current_decay,
+                      corpi_l[cn_idx] / 2);
+
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)attacchi[cn_idx],
+                       attacchi_l[cn_idx], 3000);
+      while (HAL_GPIO_ReadPin(USER_BUTTON_GPIO_Port, USER_BUTTON_Pin) ==
+             GPIO_PIN_SET) {
+        HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)corpi[cn_idx],
+                         corpi_l[cn_idx], 3000);
+      }
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)current_decay,
+                       corpi_l[cn_idx] / 2, 3000);
+      cn_idx++;
+      cn_idx %= PEDALINATOR_N_NOTES;
     }
 #endif
 
