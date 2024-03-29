@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "app_usbx_device.h"
 #include "gpdma.h"
 #include "gpio.h"
 #include "icache.h"
@@ -443,17 +444,17 @@ int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base,
 
 // returns the new current note length
 size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
-                         size_t base_len, int dsem) {
+                            size_t base_len, int dsem) {
   if (dsem == 0) {
     return 0;
   }
   long double ratio = powl(2.0, dsem / 12.0);
-  size_t L = (size_t) ((double)base_len / ratio);
+  size_t L = (size_t)((double)base_len / ratio);
   if (curr_max_len < L) {
     Error_Handler();
   }
   for (size_t i = 0; i < L; i++) {
-    double x = (double) i * ratio;
+    double x = (double)i * ratio;
     double y = x - (size_t)x;
     size_t z = (size_t)x % base_len;
     curr[i] = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
@@ -477,6 +478,7 @@ uint32_t board_millis(void) { return HAL_GetTick(); }
  * @retval int
  */
 int main(void) {
+
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -508,6 +510,7 @@ int main(void) {
   MX_ADC1_Init();
   MX_SAI1_Init();
   MX_TIM1_Init();
+  MX_USBX_Device_Init();
   /* USER CODE BEGIN 2 */
 
 #ifdef TEST_TIMER
@@ -646,7 +649,9 @@ int main(void) {
         HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)c_corpo, c_corpo_len, 10000);
       }
       dsem--;
-      c_corpo_len = corpo_pitch_shifting(c_corpo, C_CORPO_MAX_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, dsem);
+      c_corpo_len =
+          corpo_pitch_shifting(c_corpo, C_CORPO_MAX_L, sample_D2_22kHz_corpo,
+                               SAMPLE_D2_22KHZ_CORPO_L, dsem);
       print("c_corpo_len = %lu\r\n", c_corpo_len);
     }
 #endif

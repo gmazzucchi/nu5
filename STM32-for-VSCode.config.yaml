@@ -79,6 +79,8 @@ includeDirectories:
   - Core/Src/**
   - Core/Lib/tinyusb/src/
   - Core/Lib/tinyusb/hw
+  - Middlewares/**
+  - USBX/**
 
 
 # Files that should be included in the compilation.
@@ -89,6 +91,8 @@ includeDirectories:
 sourceFiles:  
   - Src/**
   - Core/Src/**
+  - Middlewares/**/*.c
+  - USBX/**/*.c
   # - Core/Lib/tinyusb/src/**/*.c
 
 

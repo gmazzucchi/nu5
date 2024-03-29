@@ -1,4 +1,3 @@
-/* USER CODE BEGIN Header */
 /**
  ******************************************************************************
  * @file    stm32u5xx_hal_conf.h
@@ -7,7 +6,7 @@
  ******************************************************************************
  * @attention
  *
- * Copyright (c) 2021 STMicroelectronics.
+ * Copyright (c) 2021-2023 STMicroelectronics.
  * All rights reserved.
  *
  * This software is licensed under terms that can be found in the LICENSE file
@@ -16,7 +15,6 @@
  *
  ******************************************************************************
  */
-/* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef STM32U5xx_HAL_CONF_H
@@ -33,7 +31,6 @@ extern "C" {
 /**
  * @brief This is the list of modules to be used in the HAL driver
  */
-
 #define HAL_MODULE_ENABLED
 
 #define HAL_ADC_MODULE_ENABLED
@@ -138,8 +135,8 @@ extern "C" {
 #if !defined(HSI48_VALUE)
 #define HSI48_VALUE                                                            \
   48000000UL /*!< Value of the Internal High Speed oscillator for USB          \
-               FS/SDMMC/RNG in Hz. The real value my vary depending on         \
-               manufacturing process variations.*/
+                FS/SDMMC/RNG in Hz. The real value my vary depending on                                           \
+                manufacturing process variations.*/
 #endif       /* HSI48_VALUE */
 
 /**
@@ -147,18 +144,18 @@ extern "C" {
  */
 #if !defined(LSI_VALUE)
 #define LSI_VALUE 32000UL /*!< LSI Typical Value in Hz*/
-#endif /* LSI_VALUE */ /*!< Value of the Internal Low Speed oscillator in Hz   \
-                            The real value may vary depending on the           \
-                          variations in voltage and temperature.*/
+#endif /* LSI_VALUE */ /*!< Value of the Internal Low Speed oscillator in Hz.  \
+The real value may vary depending on the variations in voltage and                               \
+temperature.*/
+
 /**
  * @brief External Low Speed oscillator (LSE) value.
  *        This value is used by the UART, RTC HAL module to compute the system
  * frequency
  */
 #if !defined(LSE_VALUE)
-#define LSE_VALUE                                                              \
-  32768UL /*!< Value of the External Low Speed oscillator in Hz */
-#endif    /* LSE_VALUE */
+#define LSE_VALUE 32768UL /*!< Value of the External oscillator in Hz*/
+#endif                    /* LSE_VALUE */
 
 #if !defined(LSE_STARTUP_TIMEOUT)
 #define LSE_STARTUP_TIMEOUT 5000UL /*!< Time out for LSE start up, in ms */
@@ -181,10 +178,9 @@ extern "C" {
 /**
  * @brief This is the HAL system configuration section
  */
-
 #define VDD_VALUE 3300UL /*!< Value of VDD in mv */
 #define TICK_INT_PRIORITY                                                      \
-  (0UL) /*!< tick interrupt priority (lowest by default)  */
+  (0UL) /*!< tick interrupt priority (lowest by default) */
 #define USE_RTOS 0U
 #define PREFETCH_ENABLE 1U /*!< Enable prefetch */
 
@@ -193,7 +189,6 @@ extern "C" {
  * @brief Uncomment the line below to expanse the "assert_param" macro in the
  *        HAL drivers code
  */
-
 /* #define USE_FULL_ASSERT    1U */
 
 /* ################## Register callback feature configuration ############### */
@@ -307,7 +302,7 @@ extern "C" {
 /* ################## SDMMC peripheral configuration #########################
  */
 
-#define USE_SD_TRANSCEIVER 0U /*!< use uSD Transceiver */
+#define USE_SD_TRANSCEIVER 0U
 
 /* Includes ------------------------------------------------------------------*/
 /**
