@@ -463,6 +463,65 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
 }
 #endif
 
+#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
+#include "sample_22kHz_D1.h"
+
+/* // WORKING PYTHON ALGORITHM
+ lp = LOOP_POINT_DATA[sample]["lp_start"]
+ls = LOOP_POINT_DATA[sample]["lp_stop"]
+(frames, nframes) = soundfile.read(sample + ".wav")
+attacco_frames = frames[:lp]
+corpo_frames = frames[lp:ls]
+dsem = 4
+ratio = 2**(dsem/12)
+IL = len(corpo_frames)
+L = math.trunc(len(corpo_frames) / ratio)
+corpo_frames_2 = [0] * L
+for i in range(0, L):
+    x = (i * ratio)
+    y = x - math.trunc(x)
+    z = math.trunc(x) % IL
+    corpo_frames_2[i] = corpo_frames[z] * \
+        (1 - y) + corpo_frames[(z + 1) % IL] * y */
+
+int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base,
+                           size_t base_len, int dsem) {
+  if (dsem == 0) {
+    return 0;
+  }
+  double ratio = pow(2.0, dsem / 12.0);
+  size_t L = base_len / ratio;
+  size_t IL = base_len;
+  for (size_t i = 0; i < L; i++) {
+    double x = i * ratio;
+    size_t y = (size_t)x;
+    size_t z = (size_t)x % IL;
+    curr[i] = base[z] * (1 - y) + base[(z + 1) % IL] * y;
+  }
+  return 0;
+}
+
+// returns the new current note length
+size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
+                            size_t base_len, int dsem) {
+  if (dsem == 0) {
+    return 0;
+  }
+  long double ratio = powl(2.0, dsem / 12.0);
+  size_t L = (size_t)((double)base_len / ratio);
+  if (curr_max_len < L) {
+    Error_Handler();
+  }
+  for (size_t i = 0; i < L; i++) {
+    double x = (double)i * ratio;
+    double y = x - (size_t)x;
+    size_t z = (size_t)x % base_len;
+    curr[i] = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
+  }
+  return L;
+}
+#endif
+
 // MIDI USER FUNCTIONS
 
 void board_led_write(bool led_state) {
@@ -470,6 +529,11 @@ void board_led_write(bool led_state) {
 }
 
 uint32_t board_millis(void) { return HAL_GetTick(); }
+
+size_t min(size_t x, size_t y) {
+  size_t res = x > y ? y : x;
+  return res;
+}
 
 /* USER CODE END 0 */
 
@@ -574,6 +638,19 @@ int main(void) {
   // int16_t c_decay[];
 #endif
 
+#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
+#define C_CORPO_MAX_L 50000
+  int16_t c_corpo[C_CORPO_MAX_L] = {0};
+  memset(c_corpo, 0, C_CORPO_MAX_L * sizeof(int16_t));
+  size_t c_corpo_len = 0;
+
+  int16_t c_adder[C_CORPO_MAX_L] = {0};
+  memcpy(c_adder, sample_D1_22kHz_corpo,
+         SAMPLE_D1_22KHZ_CORPO_L * sizeof(int16_t));
+  // size_t c_adder_len = SAMPLE_D2_22KHZ_CORPO_L;
+  int pstate = 0;
+#endif
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -654,6 +731,68 @@ int main(void) {
                                SAMPLE_D2_22KHZ_CORPO_L, dsem);
       print("c_corpo_len = %lu\r\n", c_corpo_len);
     }
+#endif
+
+#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
+    /*
+    SOMETHING WORKS!!!
+
+    Check all the 4 buttons
+    if not changed since the last state: ok
+    elaborate the note to play accordingly to the four buttons
+    TODO: probably some sort of phase shifting will be necessary AND surely some
+    sort of time stretching will be also needed. Now we will test cutting the
+    minimum of the stuff
+
+    The final version will make use of the DMA to offload the audio stuff and
+    allow the audio to flow with no interruptions
+    */
+    GPIO_PinState n1 = HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
+    GPIO_PinState n2 = HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
+    GPIO_PinState n3 = HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
+    GPIO_PinState n4 = HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
+    int nstate = n1 | n2 << 1 | n3 << 2 | n4 << 3;
+    if (nstate != pstate) {
+      pstate = nstate;
+      c_corpo_len = SIZE_MAX;
+      memset(c_corpo, 0, C_CORPO_MAX_L * sizeof(int16_t));
+      if (n1 == GPIO_PIN_RESET) {
+        memcpy(c_corpo, sample_D1_22kHz_corpo,
+               SAMPLE_D1_22KHZ_CORPO_L * sizeof(int16_t));
+        c_corpo_len = SAMPLE_D1_22KHZ_CORPO_L;
+      }
+      if (n2 == GPIO_PIN_RESET) {
+        size_t to_add =
+            corpo_pitch_shifting(c_adder, C_CORPO_MAX_L, sample_D1_22kHz_corpo,
+                                 SAMPLE_D1_22KHZ_CORPO_L, 2);
+        c_corpo_len = min(c_corpo_len, to_add);
+        for (size_t i = 0; i < to_add && i < c_corpo_len; i++) {
+          c_corpo[i] += c_adder[i];
+        }
+      }
+      if (n3 == GPIO_PIN_RESET) {
+        size_t to_add =
+            corpo_pitch_shifting(c_adder, C_CORPO_MAX_L, sample_D1_22kHz_corpo,
+                                 SAMPLE_D1_22KHZ_CORPO_L, 4);
+        c_corpo_len = min(c_corpo_len, to_add);
+        for (size_t i = 0; i < to_add && i < c_corpo_len; i++) {
+          c_corpo[i] += c_adder[i];
+        }
+      }
+      if (n4 == GPIO_PIN_RESET) {
+        size_t to_add =
+            corpo_pitch_shifting(c_adder, C_CORPO_MAX_L, sample_D1_22kHz_corpo,
+                                 SAMPLE_D1_22KHZ_CORPO_L, 5);
+        c_corpo_len = min(c_corpo_len, to_add);
+        for (size_t i = 0; i < to_add && i < c_corpo_len; i++) {
+          c_corpo[i] += c_adder[i];
+        }
+      }
+    }
+    if (c_corpo_len != SIZE_MAX) {
+      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)c_corpo, c_corpo_len, 3000);
+    }
+
 #endif
 
 #ifdef TEST_INTERRUPTS

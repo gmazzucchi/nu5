@@ -74,8 +74,16 @@ void Error_Handler(void);
 #define USER_BUTTON_EXTI_IRQn EXTI13_IRQn
 #define VBUS_SENSE_Pin GPIO_PIN_2
 #define VBUS_SENSE_GPIO_Port GPIOC
+#define NOTA2_Pin GPIO_PIN_0
+#define NOTA2_GPIO_Port GPIOB
 #define USER_SWITCH_Pin GPIO_PIN_13
 #define USER_SWITCH_GPIO_Port GPIOF
+#define NOTA3_Pin GPIO_PIN_12
+#define NOTA3_GPIO_Port GPIOE
+#define NOTA4_Pin GPIO_PIN_14
+#define NOTA4_GPIO_Port GPIOE
+#define NOTA1_Pin GPIO_PIN_15
+#define NOTA1_GPIO_Port GPIOE
 #define UCPD_FLT_Pin GPIO_PIN_14
 #define UCPD_FLT_GPIO_Port GPIOB
 #define UCPD1_CC2_Pin GPIO_PIN_15
