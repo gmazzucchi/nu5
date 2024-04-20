@@ -35,8 +35,10 @@
 /** Configure pins
      PC14-OSC32_IN (PC14)   ------> RCC_OSC32_IN
      PC15-OSC32_OUT (PC15)   ------> RCC_OSC32_OUT
+     PB15   ------> UCPD1_CC2
      PA13 (JTMS/SWDIO)   ------> DEBUG_JTMS-SWDIO
      PA14 (JTCK/SWCLK)   ------> DEBUG_JTCK-SWCLK
+     PA15 (JTDI)   ------> UCPD1_CC1
      PB3 (JTDO/TRACESWO)   ------> DEBUG_JTDO-SWO
 */
 void MX_GPIO_Init(void) {
@@ -91,6 +93,12 @@ void MX_GPIO_Init(void) {
   HAL_GPIO_Init(UCPD_FLT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PtPin */
+  GPIO_InitStruct.Pin = UCPD1_CC2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(UCPD1_CC2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = LED_RED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
@@ -103,6 +111,12 @@ void MX_GPIO_Init(void) {
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(LED_GREEN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PtPin */
+  GPIO_InitStruct.Pin = UCPD1_CC1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(UCPD1_CC1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = UCPD_DBn_Pin;

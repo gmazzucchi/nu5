@@ -93,7 +93,7 @@ sourceFiles:
   - Core/Src/**
   - Middlewares/**/*.c
   - USBX/**/*.c
-  # - Core/Lib/tinyusb/src/**/*.c
+  - Core/Lib/tinyusb/src/**/*.c
 
 
 # When no makefile is present it will show a warning pop-up.

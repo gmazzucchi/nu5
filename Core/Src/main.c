@@ -19,14 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
-#include "app_usbx_device.h"
 #include "gpdma.h"
 #include "gpio.h"
 #include "icache.h"
 #include "memorymap.h"
 #include "sai.h"
 #include "tim.h"
-#include "ucpd.h"
 #include "usart.h"
 #include "usb_otg.h"
 
@@ -41,6 +39,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <tusb.h>
 
 /* USER CODE END Includes */
 
@@ -67,6 +66,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void SystemPower_Config(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -535,6 +535,91 @@ size_t min(size_t x, size_t y) {
   return res;
 }
 
+enum {
+  BLINK_NOT_MOUNTED = 250,
+  BLINK_MOUNTED = 1000,
+  BLINK_SUSPENDED = 2500,
+};
+
+static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
+
+void led_blinking_task(void) {
+  static uint32_t start_ms = 0;
+  static bool led_state = false;
+
+  // Blink every interval ms
+  if (board_millis() - start_ms < blink_interval_ms)
+    return; // not enough time
+  start_ms += blink_interval_ms;
+
+  board_led_write(led_state);
+  led_state = 1 - led_state; // toggle
+}
+
+//--------------------------------------------------------------------+
+// Device callbacks
+//--------------------------------------------------------------------+
+
+// Invoked when device is mounted
+void tud_mount_cb(void) { blink_interval_ms = BLINK_MOUNTED; }
+
+// Invoked when device is unmounted
+void tud_umount_cb(void) { blink_interval_ms = BLINK_NOT_MOUNTED; }
+
+// Invoked when usb bus is suspended
+// remote_wakeup_en : if host allow us  to perform remote wakeup
+// Within 7ms, device must draw an average of current less than 2.5 mA from bus
+void tud_suspend_cb(bool remote_wakeup_en) {
+  (void)remote_wakeup_en;
+  blink_interval_ms = BLINK_SUSPENDED;
+}
+
+// Invoked when usb bus is resumed
+void tud_resume_cb(void) {
+  blink_interval_ms = tud_mounted() ? BLINK_MOUNTED : BLINK_NOT_MOUNTED;
+}
+
+//--------------------------------------------------------------------+
+// USB CDC
+//--------------------------------------------------------------------+
+void cdc_task(void) {
+  // connected() check for DTR bit
+  // Most but not all terminal client set this when making connection
+  // if ( tud_cdc_connected() )
+  {
+    // connected and there are data available
+    if (tud_cdc_available()) {
+      // read data
+      char buf[64];
+      uint32_t count = tud_cdc_read(buf, sizeof(buf));
+      (void)count;
+
+      // Echo back
+      // Note: Skip echo by commenting out write() and write_flush()
+      // for throughput test e.g
+      //    $ dd if=/dev/zero of=/dev/ttyACM0 count=10000
+      tud_cdc_write(buf, count);
+      tud_cdc_write_flush();
+    }
+  }
+}
+
+// Invoked when cdc when line state changed e.g connected/disconnected
+void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts) {
+  (void)itf;
+  (void)rts;
+
+  // TODO set some indicator
+  if (dtr) {
+    // Terminal connected
+  } else {
+    // Terminal disconnected
+  }
+}
+
+// Invoked when CDC interface received data from host
+void tud_cdc_rx_cb(uint8_t itf) { (void)itf; }
+
 /* USER CODE END 0 */
 
 /**
@@ -560,6 +645,9 @@ int main(void) {
   /* Configure the system clock */
   SystemClock_Config();
 
+  /* Configure the System Power */
+  SystemPower_Config();
+
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
@@ -568,13 +656,11 @@ int main(void) {
   MX_GPIO_Init();
   MX_GPDMA1_Init();
   MX_ICACHE_Init();
-  MX_UCPD1_Init();
   MX_USART1_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_ADC1_Init();
   MX_SAI1_Init();
   MX_TIM1_Init();
-  MX_USBX_Device_Init();
   /* USER CODE BEGIN 2 */
 
 #ifdef TEST_TIMER
@@ -651,11 +737,18 @@ int main(void) {
   int pstate = 0;
 #endif
 
+  tusb_init();
+  tud_init(BOARD_TUD_RHPORT);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
+
+    tud_task(); // device task
+    led_blinking_task();
+    cdc_task();
 
 #ifdef PEDALINATOR_PITCH_MODULATION
     if (semitone_up) {
@@ -922,6 +1015,21 @@ void SystemClock_Config(void) {
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK) {
     Error_Handler();
   }
+}
+
+/**
+ * @brief Power Configuration
+ * @retval None
+ */
+static void SystemPower_Config(void) {
+  HAL_PWREx_EnableVddIO2();
+
+  /*
+   * Disable the internal Pull-Up in Dead Battery pins of UCPD peripheral
+   */
+  HAL_PWREx_DisableUCPDDeadBattery();
+  /* USER CODE BEGIN PWR */
+  /* USER CODE END PWR */
 }
 
 /* USER CODE BEGIN 4 */
