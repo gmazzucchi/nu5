@@ -39,7 +39,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
+#include "tinyusb_pedalinator_porting.h"
 #include <tusb.h>
+#endif
 
 /* USER CODE END Includes */
 
@@ -522,104 +526,6 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
 }
 #endif
 
-// MIDI USER FUNCTIONS
-
-void board_led_write(bool led_state) {
-  HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, led_state);
-}
-
-uint32_t board_millis(void) { return HAL_GetTick(); }
-
-size_t min(size_t x, size_t y) {
-  size_t res = x > y ? y : x;
-  return res;
-}
-
-enum {
-  BLINK_NOT_MOUNTED = 250,
-  BLINK_MOUNTED = 1000,
-  BLINK_SUSPENDED = 2500,
-};
-
-static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
-
-void led_blinking_task(void) {
-  static uint32_t start_ms = 0;
-  static bool led_state = false;
-
-  // Blink every interval ms
-  if (board_millis() - start_ms < blink_interval_ms)
-    return; // not enough time
-  start_ms += blink_interval_ms;
-
-  board_led_write(led_state);
-  led_state = 1 - led_state; // toggle
-}
-
-//--------------------------------------------------------------------+
-// Device callbacks
-//--------------------------------------------------------------------+
-
-// Invoked when device is mounted
-void tud_mount_cb(void) { blink_interval_ms = BLINK_MOUNTED; }
-
-// Invoked when device is unmounted
-void tud_umount_cb(void) { blink_interval_ms = BLINK_NOT_MOUNTED; }
-
-// Invoked when usb bus is suspended
-// remote_wakeup_en : if host allow us  to perform remote wakeup
-// Within 7ms, device must draw an average of current less than 2.5 mA from bus
-void tud_suspend_cb(bool remote_wakeup_en) {
-  (void)remote_wakeup_en;
-  blink_interval_ms = BLINK_SUSPENDED;
-}
-
-// Invoked when usb bus is resumed
-void tud_resume_cb(void) {
-  blink_interval_ms = tud_mounted() ? BLINK_MOUNTED : BLINK_NOT_MOUNTED;
-}
-
-//--------------------------------------------------------------------+
-// USB CDC
-//--------------------------------------------------------------------+
-void cdc_task(void) {
-  // connected() check for DTR bit
-  // Most but not all terminal client set this when making connection
-  // if ( tud_cdc_connected() )
-  {
-    // connected and there are data available
-    if (tud_cdc_available()) {
-      // read data
-      char buf[64];
-      uint32_t count = tud_cdc_read(buf, sizeof(buf));
-      (void)count;
-
-      // Echo back
-      // Note: Skip echo by commenting out write() and write_flush()
-      // for throughput test e.g
-      //    $ dd if=/dev/zero of=/dev/ttyACM0 count=10000
-      tud_cdc_write(buf, count);
-      tud_cdc_write_flush();
-    }
-  }
-}
-
-// Invoked when cdc when line state changed e.g connected/disconnected
-void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts) {
-  (void)itf;
-  (void)rts;
-
-  // TODO set some indicator
-  if (dtr) {
-    // Terminal connected
-  } else {
-    // Terminal disconnected
-  }
-}
-
-// Invoked when CDC interface received data from host
-void tud_cdc_rx_cb(uint8_t itf) { (void)itf; }
-
 /* USER CODE END 0 */
 
 /**
@@ -737,8 +643,10 @@ int main(void) {
   int pstate = 0;
 #endif
 
+#ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
   tusb_init();
   tud_init(BOARD_TUD_RHPORT);
+#endif
 
   /* USER CODE END 2 */
 
@@ -746,9 +654,11 @@ int main(void) {
   /* USER CODE BEGIN WHILE */
   while (1) {
 
+#ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
     tud_task(); // device task
     led_blinking_task();
     cdc_task();
+#endif
 
 #ifdef PEDALINATOR_PITCH_MODULATION
     if (semitone_up) {
