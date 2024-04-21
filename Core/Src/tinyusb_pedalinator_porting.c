@@ -12,11 +12,6 @@ void board_led_write(bool led_state) {
 
 uint32_t board_millis(void) { return HAL_GetTick(); }
 
-size_t min(size_t x, size_t y) {
-  size_t res = x > y ? y : x;
-  return res;
-}
-
 enum {
   BLINK_NOT_MOUNTED = 250,
   BLINK_MOUNTED = 1000,

@@ -26,7 +26,9 @@
 /* USER CODE END 0 */
 
 SAI_HandleTypeDef hsai_BlockA1;
-DMA_HandleTypeDef handle_GPDMA1_Channel15;
+DMA_NodeTypeDef Node_GPDMA1_Channel11;
+DMA_QListTypeDef List_GPDMA1_Channel11;
+DMA_HandleTypeDef handle_GPDMA1_Channel11;
 
 /* SAI1 init function */
 void MX_SAI1_Init(void) {
@@ -64,6 +66,7 @@ static uint32_t SAI1_client = 0;
 void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
 
   GPIO_InitTypeDef GPIO_InitStruct;
+  DMA_NodeConfTypeDef NodeConfig;
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
   /* SAI1 */
   if (saiHandle->Instance == SAI1_Block_A) {
@@ -75,10 +78,10 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
     PeriphClkInit.Sai1ClockSelection = RCC_SAI1CLKSOURCE_PLL2;
     PeriphClkInit.PLL2.PLL2Source = RCC_PLLSOURCE_MSI;
     PeriphClkInit.PLL2.PLL2M = 3;
-    PeriphClkInit.PLL2.PLL2N = 8;
-    PeriphClkInit.PLL2.PLL2P = 1;
-    PeriphClkInit.PLL2.PLL2Q = 2;
-    PeriphClkInit.PLL2.PLL2R = 2;
+    PeriphClkInit.PLL2.PLL2N = 16;
+    PeriphClkInit.PLL2.PLL2P = 4;
+    PeriphClkInit.PLL2.PLL2Q = 4;
+    PeriphClkInit.PLL2.PLL2R = 4;
     PeriphClkInit.PLL2.PLL2RGE = RCC_PLLVCIRANGE_1;
     PeriphClkInit.PLL2.PLL2FRACN = 0;
     PeriphClkInit.PLL2.PLL2ClockOut = RCC_PLL2_DIVP;
@@ -109,29 +112,61 @@ void HAL_SAI_MspInit(SAI_HandleTypeDef *saiHandle) {
 
     /* Peripheral DMA init*/
 
-    handle_GPDMA1_Channel15.Instance = GPDMA1_Channel15;
-    handle_GPDMA1_Channel15.Init.Request = GPDMA1_REQUEST_SAI1_A;
-    handle_GPDMA1_Channel15.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
-    handle_GPDMA1_Channel15.Init.Direction = DMA_MEMORY_TO_PERIPH;
-    handle_GPDMA1_Channel15.Init.SrcInc = DMA_SINC_FIXED;
-    handle_GPDMA1_Channel15.Init.DestInc = DMA_DINC_FIXED;
-    handle_GPDMA1_Channel15.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
-    handle_GPDMA1_Channel15.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
-    handle_GPDMA1_Channel15.Init.Priority = DMA_HIGH_PRIORITY;
-    handle_GPDMA1_Channel15.Init.SrcBurstLength = 1;
-    handle_GPDMA1_Channel15.Init.DestBurstLength = 1;
-    handle_GPDMA1_Channel15.Init.TransferAllocatedPort =
-        DMA_SRC_ALLOCATED_PORT0 | DMA_DEST_ALLOCATED_PORT1;
-    handle_GPDMA1_Channel15.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
-    handle_GPDMA1_Channel15.Init.Mode = DMA_NORMAL;
-    if (HAL_DMA_Init(&handle_GPDMA1_Channel15) != HAL_OK) {
+    NodeConfig.NodeType = DMA_GPDMA_LINEAR_NODE;
+    NodeConfig.Init.Request = GPDMA1_REQUEST_SAI1_A;
+    NodeConfig.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
+    NodeConfig.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    NodeConfig.Init.SrcInc = DMA_SINC_INCREMENTED;
+    NodeConfig.Init.DestInc = DMA_DINC_FIXED;
+    NodeConfig.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
+    NodeConfig.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
+    NodeConfig.Init.SrcBurstLength = 1;
+    NodeConfig.Init.DestBurstLength = 1;
+    NodeConfig.Init.TransferAllocatedPort =
+        DMA_SRC_ALLOCATED_PORT0 | DMA_DEST_ALLOCATED_PORT0;
+    NodeConfig.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
+    NodeConfig.Init.Mode = DMA_NORMAL;
+    NodeConfig.TriggerConfig.TriggerPolarity = DMA_TRIG_POLARITY_MASKED;
+    NodeConfig.DataHandlingConfig.DataExchange = DMA_EXCHANGE_NONE;
+    NodeConfig.DataHandlingConfig.DataAlignment =
+        DMA_DATA_RIGHTALIGN_ZEROPADDED;
+    if (HAL_DMAEx_List_BuildNode(&NodeConfig, &Node_GPDMA1_Channel11) !=
+        HAL_OK) {
       Error_Handler();
     }
 
-    __HAL_LINKDMA(saiHandle, hdmatx, handle_GPDMA1_Channel15);
+    if (HAL_DMAEx_List_InsertNode(&List_GPDMA1_Channel11, NULL,
+                                  &Node_GPDMA1_Channel11) != HAL_OK) {
+      Error_Handler();
+    }
 
-    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel15,
-                                        DMA_CHANNEL_PRIV) != HAL_OK) {
+    if (HAL_DMAEx_List_SetCircularMode(&List_GPDMA1_Channel11) != HAL_OK) {
+      Error_Handler();
+    }
+
+    handle_GPDMA1_Channel11.Instance = GPDMA1_Channel11;
+    handle_GPDMA1_Channel11.InitLinkedList.Priority = DMA_HIGH_PRIORITY;
+    handle_GPDMA1_Channel11.InitLinkedList.LinkStepMode =
+        DMA_LSM_FULL_EXECUTION;
+    handle_GPDMA1_Channel11.InitLinkedList.LinkAllocatedPort =
+        DMA_LINK_ALLOCATED_PORT0;
+    handle_GPDMA1_Channel11.InitLinkedList.TransferEventMode =
+        DMA_TCEM_BLOCK_TRANSFER;
+    handle_GPDMA1_Channel11.InitLinkedList.LinkedListMode =
+        DMA_LINKEDLIST_CIRCULAR;
+    if (HAL_DMAEx_List_Init(&handle_GPDMA1_Channel11) != HAL_OK) {
+      Error_Handler();
+    }
+
+    if (HAL_DMAEx_List_LinkQ(&handle_GPDMA1_Channel11,
+                             &List_GPDMA1_Channel11) != HAL_OK) {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(saiHandle, hdmatx, handle_GPDMA1_Channel11);
+
+    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel11,
+                                        DMA_CHANNEL_NPRIV) != HAL_OK) {
       Error_Handler();
     }
   }

@@ -125,12 +125,14 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 }
 #endif
 
+// #define SAMPLING_FREQUENCY (22500U)
+// #define CURRENT_NOTE_DURATION (1U) // in s
+// #define CURRENT_NOTE_LENGTH (SAMPLING_FREQUENCY * CURRENT_NOTE_DURATION)
+
+#ifdef PEDALINATOR_HSAI_IT
+
 bool dma_completed = true;
 bool sai_it_completed = true;
-
-#define SAMPLING_FREQUENCY (22500U)
-#define CURRENT_NOTE_DURATION (1U) // in s
-#define CURRENT_NOTE_LENGTH (SAMPLING_FREQUENCY * CURRENT_NOTE_DURATION)
 
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
   if (hsai == &hsai_BlockA1) {
@@ -145,6 +147,7 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
     }
   }
 }
+#endif
 
 const char falling_message[] = "falling interrupts enabled\r\n";
 const char rising_message[] = "rising interrupts enabled\r\n";
@@ -524,6 +527,54 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
   }
   return L;
 }
+
+size_t min(size_t x, size_t y) {
+  size_t res = x > y ? y : x;
+  return res;
+}
+
+bool dma_transfer_completed = false;
+void pedalinator_dma_completed_transfer_cb(DMA_HandleTypeDef *const hdma) {
+  if (hdma == &handle_GPDMA1_Channel11) {
+    dma_transfer_completed = true;
+  }
+}
+
+void pedalinator_dma_error_cb(DMA_HandleTypeDef *const hdma) {
+  HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);
+  Error_Handler();
+}
+
+void pedalinator_dma_abort_cb(DMA_HandleTypeDef *const hdma) {
+  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+}
+
+void pedalinator_dma_suspend_cb(DMA_HandleTypeDef *const hdma) {
+  // HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+  // HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);
+}
+
+void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
+  if (hsai == &hsai_BlockA1) {
+    dma_transfer_completed = true;
+  }
+}
+
+void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
+  return;
+  if (hsai == &hsai_BlockA1) {
+    uint32_t prevtime = HAL_GetTick();
+    while (1) {
+      uint32_t ctime = HAL_GetTick();
+      if ((ctime - prevtime) > 100) {
+        prevtime = HAL_GetTick();
+        HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+        HAL_GPIO_TogglePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin);
+      }
+    }
+  }
+}
+
 #endif
 
 /* USER CODE END 0 */
@@ -641,6 +692,36 @@ int main(void) {
          SAMPLE_D1_22KHZ_CORPO_L * sizeof(int16_t));
   // size_t c_adder_len = SAMPLE_D2_22KHZ_CORPO_L;
   int pstate = 0;
+
+  HAL_StatusTypeDef result;
+
+  result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11,
+                                    HAL_DMA_XFER_CPLT_CB_ID,
+                                    pedalinator_dma_completed_transfer_cb);
+  if (result != HAL_OK) {
+    Error_Handler();
+  }
+
+  result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11,
+                                    HAL_DMA_XFER_ERROR_CB_ID,
+                                    pedalinator_dma_error_cb);
+  if (result != HAL_OK) {
+    Error_Handler();
+  }
+
+  result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11,
+                                    HAL_DMA_XFER_ABORT_CB_ID,
+                                    pedalinator_dma_abort_cb);
+  if (result != HAL_OK) {
+    Error_Handler();
+  }
+
+  result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11,
+                                    HAL_DMA_XFER_SUSPEND_CB_ID,
+                                    pedalinator_dma_suspend_cb);
+  if (result != HAL_OK) {
+    Error_Handler();
+  }
 #endif
 
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
@@ -793,7 +874,14 @@ int main(void) {
       }
     }
     if (c_corpo_len != SIZE_MAX) {
-      HAL_SAI_Transmit(&hsai_BlockA1, (uint8_t *)c_corpo, c_corpo_len, 3000);
+      HAL_SAI_Transmit_DMA(&hsai_BlockA1, (uint8_t *)c_corpo,
+                           (uint16_t)c_corpo_len);
+      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+      while (!dma_transfer_completed)
+        ;
+      dma_transfer_completed = false;
+      HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+      HAL_SAI_DMAStop(&hsai_BlockA1);
     }
 
 #endif

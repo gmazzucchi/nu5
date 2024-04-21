@@ -41,7 +41,7 @@ extern SAI_HandleTypeDef hsai_BlockA1;
 void MX_SAI1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+extern DMA_HandleTypeDef handle_GPDMA1_Channel11;
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
