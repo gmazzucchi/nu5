@@ -37,7 +37,7 @@ void MX_ADC1_Init(void) {
     /* USER CODE END ADC1_Init 1 */
 
     /** Common config
-   */
+  */
     hadc1.Instance                      = ADC1;
     hadc1.Init.ClockPrescaler           = ADC_CLOCK_ASYNC_DIV1;
     hadc1.Init.Resolution               = ADC_RESOLUTION_14B;
@@ -71,7 +71,7 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef *adcHandle) {
         /* USER CODE END ADC1_MspInit 0 */
 
         /** Initializes the peripherals clock
-     */
+  */
         PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADCDAC;
         PeriphClkInit.AdcDacClockSelection = RCC_ADCDACCLKSOURCE_HSI;
         if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {

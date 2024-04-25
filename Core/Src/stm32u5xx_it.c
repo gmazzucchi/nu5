@@ -58,6 +58,9 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern DMA_NodeTypeDef Node_GPDMA1_Channel10;
+extern DMA_QListTypeDef List_GPDMA1_Channel10;
+extern DMA_HandleTypeDef handle_GPDMA1_Channel10;
 extern DMA_NodeTypeDef Node_GPDMA1_Channel11;
 extern DMA_QListTypeDef List_GPDMA1_Channel11;
 extern DMA_HandleTypeDef handle_GPDMA1_Channel11;
@@ -72,8 +75,8 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 /*           Cortex Processor Interruption and Exception Handlers          */
 /******************************************************************************/
 /**
- * @brief This function handles Non maskable interrupt.
- */
+  * @brief This function handles Non maskable interrupt.
+  */
 void NMI_Handler(void) {
     /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
 
@@ -85,8 +88,8 @@ void NMI_Handler(void) {
 }
 
 /**
- * @brief This function handles Hard fault interrupt.
- */
+  * @brief This function handles Hard fault interrupt.
+  */
 void HardFault_Handler(void) {
     /* USER CODE BEGIN HardFault_IRQn 0 */
 
@@ -98,8 +101,8 @@ void HardFault_Handler(void) {
 }
 
 /**
- * @brief This function handles Memory management fault.
- */
+  * @brief This function handles Memory management fault.
+  */
 void MemManage_Handler(void) {
     /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
@@ -111,8 +114,8 @@ void MemManage_Handler(void) {
 }
 
 /**
- * @brief This function handles Prefetch fault, memory access fault.
- */
+  * @brief This function handles Prefetch fault, memory access fault.
+  */
 void BusFault_Handler(void) {
     /* USER CODE BEGIN BusFault_IRQn 0 */
 
@@ -124,8 +127,8 @@ void BusFault_Handler(void) {
 }
 
 /**
- * @brief This function handles Undefined instruction or illegal state.
- */
+  * @brief This function handles Undefined instruction or illegal state.
+  */
 void UsageFault_Handler(void) {
     /* USER CODE BEGIN UsageFault_IRQn 0 */
 
@@ -137,8 +140,8 @@ void UsageFault_Handler(void) {
 }
 
 /**
- * @brief This function handles System service call via SWI instruction.
- */
+  * @brief This function handles System service call via SWI instruction.
+  */
 void SVC_Handler(void) {
     /* USER CODE BEGIN SVCall_IRQn 0 */
 
@@ -149,8 +152,8 @@ void SVC_Handler(void) {
 }
 
 /**
- * @brief This function handles Debug monitor.
- */
+  * @brief This function handles Debug monitor.
+  */
 void DebugMon_Handler(void) {
     /* USER CODE BEGIN DebugMonitor_IRQn 0 */
 
@@ -161,8 +164,8 @@ void DebugMon_Handler(void) {
 }
 
 /**
- * @brief This function handles Pendable request for system service.
- */
+  * @brief This function handles Pendable request for system service.
+  */
 void PendSV_Handler(void) {
     /* USER CODE BEGIN PendSV_IRQn 0 */
 
@@ -173,8 +176,8 @@ void PendSV_Handler(void) {
 }
 
 /**
- * @brief This function handles System tick timer.
- */
+  * @brief This function handles System tick timer.
+  */
 void SysTick_Handler(void) {
     /* USER CODE BEGIN SysTick_IRQn 0 */
 
@@ -193,8 +196,8 @@ void SysTick_Handler(void) {
 /******************************************************************************/
 
 /**
- * @brief This function handles EXTI Line13 interrupt.
- */
+  * @brief This function handles EXTI Line13 interrupt.
+  */
 void EXTI13_IRQHandler(void) {
     /* USER CODE BEGIN EXTI13_IRQn 0 */
 
@@ -206,8 +209,8 @@ void EXTI13_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles TIM1 Break interrupt.
- */
+  * @brief This function handles TIM1 Break interrupt.
+  */
 void TIM1_BRK_IRQHandler(void) {
     /* USER CODE BEGIN TIM1_BRK_IRQn 0 */
 
@@ -219,8 +222,8 @@ void TIM1_BRK_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles TIM1 Update interrupt.
- */
+  * @brief This function handles TIM1 Update interrupt.
+  */
 void TIM1_UP_IRQHandler(void) {
     /* USER CODE BEGIN TIM1_UP_IRQn 0 */
 
@@ -232,8 +235,8 @@ void TIM1_UP_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles TIM1 Trigger and Commutation interrupts.
- */
+  * @brief This function handles TIM1 Trigger and Commutation interrupts.
+  */
 void TIM1_TRG_COM_IRQHandler(void) {
     /* USER CODE BEGIN TIM1_TRG_COM_IRQn 0 */
 
@@ -245,8 +248,8 @@ void TIM1_TRG_COM_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles TIM1 Capture Compare interrupt.
- */
+  * @brief This function handles TIM1 Capture Compare interrupt.
+  */
 void TIM1_CC_IRQHandler(void) {
     /* USER CODE BEGIN TIM1_CC_IRQn 0 */
 
@@ -258,8 +261,8 @@ void TIM1_CC_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles USB OTG FS global interrupt.
- */
+  * @brief This function handles USB OTG FS global interrupt.
+  */
 void OTG_FS_IRQHandler(void) {
     /* USER CODE BEGIN OTG_FS_IRQn 0 */
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
@@ -274,8 +277,21 @@ void OTG_FS_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles GPDMA1 Channel 11 global interrupt.
- */
+  * @brief This function handles GPDMA1 Channel 10 global interrupt.
+  */
+void GPDMA1_Channel10_IRQHandler(void) {
+    /* USER CODE BEGIN GPDMA1_Channel10_IRQn 0 */
+
+    /* USER CODE END GPDMA1_Channel10_IRQn 0 */
+    HAL_DMA_IRQHandler(&handle_GPDMA1_Channel10);
+    /* USER CODE BEGIN GPDMA1_Channel10_IRQn 1 */
+
+    /* USER CODE END GPDMA1_Channel10_IRQn 1 */
+}
+
+/**
+  * @brief This function handles GPDMA1 Channel 11 global interrupt.
+  */
 void GPDMA1_Channel11_IRQHandler(void) {
     /* USER CODE BEGIN GPDMA1_Channel11_IRQn 0 */
 
@@ -287,8 +303,8 @@ void GPDMA1_Channel11_IRQHandler(void) {
 }
 
 /**
- * @brief This function handles Serial Audio Interface 1 global interrupt.
- */
+  * @brief This function handles Serial Audio Interface 1 global interrupt.
+  */
 void SAI1_IRQHandler(void) {
     /* USER CODE BEGIN SAI1_IRQn 0 */
 
