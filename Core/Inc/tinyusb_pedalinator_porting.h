@@ -8,4 +8,4 @@ void led_blinking_task(void);
 void cdc_task(void);
 #endif
 
-#endif // TINYUSB_PEDALINATOR_PORTING_H
+#endif  // TINYUSB_PEDALINATOR_PORTING_H

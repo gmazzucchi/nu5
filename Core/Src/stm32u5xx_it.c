@@ -19,11 +19,12 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32u5xx_it.h"
+
 #include "main.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "tusb.h"
 #include "pedalinator_config.h"
+#include "tusb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -74,114 +75,114 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
  * @brief This function handles Non maskable interrupt.
  */
 void NMI_Handler(void) {
-  /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
+    /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
 
-  /* USER CODE END NonMaskableInt_IRQn 0 */
-  /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-  while (1) {
-  }
-  /* USER CODE END NonMaskableInt_IRQn 1 */
+    /* USER CODE END NonMaskableInt_IRQn 0 */
+    /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
+    while (1) {
+    }
+    /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
 /**
  * @brief This function handles Hard fault interrupt.
  */
 void HardFault_Handler(void) {
-  /* USER CODE BEGIN HardFault_IRQn 0 */
+    /* USER CODE BEGIN HardFault_IRQn 0 */
 
-  /* USER CODE END HardFault_IRQn 0 */
-  while (1) {
-    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
-    /* USER CODE END W1_HardFault_IRQn 0 */
-  }
+    /* USER CODE END HardFault_IRQn 0 */
+    while (1) {
+        /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+        /* USER CODE END W1_HardFault_IRQn 0 */
+    }
 }
 
 /**
  * @brief This function handles Memory management fault.
  */
 void MemManage_Handler(void) {
-  /* USER CODE BEGIN MemoryManagement_IRQn 0 */
+    /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
-  /* USER CODE END MemoryManagement_IRQn 0 */
-  while (1) {
-    /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
-    /* USER CODE END W1_MemoryManagement_IRQn 0 */
-  }
+    /* USER CODE END MemoryManagement_IRQn 0 */
+    while (1) {
+        /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
+        /* USER CODE END W1_MemoryManagement_IRQn 0 */
+    }
 }
 
 /**
  * @brief This function handles Prefetch fault, memory access fault.
  */
 void BusFault_Handler(void) {
-  /* USER CODE BEGIN BusFault_IRQn 0 */
+    /* USER CODE BEGIN BusFault_IRQn 0 */
 
-  /* USER CODE END BusFault_IRQn 0 */
-  while (1) {
-    /* USER CODE BEGIN W1_BusFault_IRQn 0 */
-    /* USER CODE END W1_BusFault_IRQn 0 */
-  }
+    /* USER CODE END BusFault_IRQn 0 */
+    while (1) {
+        /* USER CODE BEGIN W1_BusFault_IRQn 0 */
+        /* USER CODE END W1_BusFault_IRQn 0 */
+    }
 }
 
 /**
  * @brief This function handles Undefined instruction or illegal state.
  */
 void UsageFault_Handler(void) {
-  /* USER CODE BEGIN UsageFault_IRQn 0 */
+    /* USER CODE BEGIN UsageFault_IRQn 0 */
 
-  /* USER CODE END UsageFault_IRQn 0 */
-  while (1) {
-    /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
-    /* USER CODE END W1_UsageFault_IRQn 0 */
-  }
+    /* USER CODE END UsageFault_IRQn 0 */
+    while (1) {
+        /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
+        /* USER CODE END W1_UsageFault_IRQn 0 */
+    }
 }
 
 /**
  * @brief This function handles System service call via SWI instruction.
  */
 void SVC_Handler(void) {
-  /* USER CODE BEGIN SVCall_IRQn 0 */
+    /* USER CODE BEGIN SVCall_IRQn 0 */
 
-  /* USER CODE END SVCall_IRQn 0 */
-  /* USER CODE BEGIN SVCall_IRQn 1 */
+    /* USER CODE END SVCall_IRQn 0 */
+    /* USER CODE BEGIN SVCall_IRQn 1 */
 
-  /* USER CODE END SVCall_IRQn 1 */
+    /* USER CODE END SVCall_IRQn 1 */
 }
 
 /**
  * @brief This function handles Debug monitor.
  */
 void DebugMon_Handler(void) {
-  /* USER CODE BEGIN DebugMonitor_IRQn 0 */
+    /* USER CODE BEGIN DebugMonitor_IRQn 0 */
 
-  /* USER CODE END DebugMonitor_IRQn 0 */
-  /* USER CODE BEGIN DebugMonitor_IRQn 1 */
+    /* USER CODE END DebugMonitor_IRQn 0 */
+    /* USER CODE BEGIN DebugMonitor_IRQn 1 */
 
-  /* USER CODE END DebugMonitor_IRQn 1 */
+    /* USER CODE END DebugMonitor_IRQn 1 */
 }
 
 /**
  * @brief This function handles Pendable request for system service.
  */
 void PendSV_Handler(void) {
-  /* USER CODE BEGIN PendSV_IRQn 0 */
+    /* USER CODE BEGIN PendSV_IRQn 0 */
 
-  /* USER CODE END PendSV_IRQn 0 */
-  /* USER CODE BEGIN PendSV_IRQn 1 */
+    /* USER CODE END PendSV_IRQn 0 */
+    /* USER CODE BEGIN PendSV_IRQn 1 */
 
-  /* USER CODE END PendSV_IRQn 1 */
+    /* USER CODE END PendSV_IRQn 1 */
 }
 
 /**
  * @brief This function handles System tick timer.
  */
 void SysTick_Handler(void) {
-  /* USER CODE BEGIN SysTick_IRQn 0 */
+    /* USER CODE BEGIN SysTick_IRQn 0 */
 
-  /* USER CODE END SysTick_IRQn 0 */
-  HAL_IncTick();
-  /* USER CODE BEGIN SysTick_IRQn 1 */
+    /* USER CODE END SysTick_IRQn 0 */
+    HAL_IncTick();
+    /* USER CODE BEGIN SysTick_IRQn 1 */
 
-  /* USER CODE END SysTick_IRQn 1 */
+    /* USER CODE END SysTick_IRQn 1 */
 }
 
 /******************************************************************************/
@@ -195,107 +196,107 @@ void SysTick_Handler(void) {
  * @brief This function handles EXTI Line13 interrupt.
  */
 void EXTI13_IRQHandler(void) {
-  /* USER CODE BEGIN EXTI13_IRQn 0 */
+    /* USER CODE BEGIN EXTI13_IRQn 0 */
 
-  /* USER CODE END EXTI13_IRQn 0 */
-  HAL_GPIO_EXTI_IRQHandler(USER_BUTTON_Pin);
-  /* USER CODE BEGIN EXTI13_IRQn 1 */
+    /* USER CODE END EXTI13_IRQn 0 */
+    HAL_GPIO_EXTI_IRQHandler(USER_BUTTON_Pin);
+    /* USER CODE BEGIN EXTI13_IRQn 1 */
 
-  /* USER CODE END EXTI13_IRQn 1 */
+    /* USER CODE END EXTI13_IRQn 1 */
 }
 
 /**
  * @brief This function handles TIM1 Break interrupt.
  */
 void TIM1_BRK_IRQHandler(void) {
-  /* USER CODE BEGIN TIM1_BRK_IRQn 0 */
+    /* USER CODE BEGIN TIM1_BRK_IRQn 0 */
 
-  /* USER CODE END TIM1_BRK_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim1);
-  /* USER CODE BEGIN TIM1_BRK_IRQn 1 */
+    /* USER CODE END TIM1_BRK_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim1);
+    /* USER CODE BEGIN TIM1_BRK_IRQn 1 */
 
-  /* USER CODE END TIM1_BRK_IRQn 1 */
+    /* USER CODE END TIM1_BRK_IRQn 1 */
 }
 
 /**
  * @brief This function handles TIM1 Update interrupt.
  */
 void TIM1_UP_IRQHandler(void) {
-  /* USER CODE BEGIN TIM1_UP_IRQn 0 */
+    /* USER CODE BEGIN TIM1_UP_IRQn 0 */
 
-  /* USER CODE END TIM1_UP_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim1);
-  /* USER CODE BEGIN TIM1_UP_IRQn 1 */
+    /* USER CODE END TIM1_UP_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim1);
+    /* USER CODE BEGIN TIM1_UP_IRQn 1 */
 
-  /* USER CODE END TIM1_UP_IRQn 1 */
+    /* USER CODE END TIM1_UP_IRQn 1 */
 }
 
 /**
  * @brief This function handles TIM1 Trigger and Commutation interrupts.
  */
 void TIM1_TRG_COM_IRQHandler(void) {
-  /* USER CODE BEGIN TIM1_TRG_COM_IRQn 0 */
+    /* USER CODE BEGIN TIM1_TRG_COM_IRQn 0 */
 
-  /* USER CODE END TIM1_TRG_COM_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim1);
-  /* USER CODE BEGIN TIM1_TRG_COM_IRQn 1 */
+    /* USER CODE END TIM1_TRG_COM_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim1);
+    /* USER CODE BEGIN TIM1_TRG_COM_IRQn 1 */
 
-  /* USER CODE END TIM1_TRG_COM_IRQn 1 */
+    /* USER CODE END TIM1_TRG_COM_IRQn 1 */
 }
 
 /**
  * @brief This function handles TIM1 Capture Compare interrupt.
  */
 void TIM1_CC_IRQHandler(void) {
-  /* USER CODE BEGIN TIM1_CC_IRQn 0 */
+    /* USER CODE BEGIN TIM1_CC_IRQn 0 */
 
-  /* USER CODE END TIM1_CC_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim1);
-  /* USER CODE BEGIN TIM1_CC_IRQn 1 */
+    /* USER CODE END TIM1_CC_IRQn 0 */
+    HAL_TIM_IRQHandler(&htim1);
+    /* USER CODE BEGIN TIM1_CC_IRQn 1 */
 
-  /* USER CODE END TIM1_CC_IRQn 1 */
+    /* USER CODE END TIM1_CC_IRQn 1 */
 }
 
 /**
  * @brief This function handles USB OTG FS global interrupt.
  */
 void OTG_FS_IRQHandler(void) {
-  /* USER CODE BEGIN OTG_FS_IRQn 0 */
+    /* USER CODE BEGIN OTG_FS_IRQn 0 */
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
-  tud_int_handler(BOARD_TUD_RHPORT);
-  return;
+    tud_int_handler(BOARD_TUD_RHPORT);
+    return;
 #endif
-  /* USER CODE END OTG_FS_IRQn 0 */
-  HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
-  /* USER CODE BEGIN OTG_FS_IRQn 1 */
+    /* USER CODE END OTG_FS_IRQn 0 */
+    HAL_PCD_IRQHandler(&hpcd_USB_OTG_FS);
+    /* USER CODE BEGIN OTG_FS_IRQn 1 */
 
-  /* USER CODE END OTG_FS_IRQn 1 */
+    /* USER CODE END OTG_FS_IRQn 1 */
 }
 
 /**
  * @brief This function handles GPDMA1 Channel 11 global interrupt.
  */
 void GPDMA1_Channel11_IRQHandler(void) {
-  /* USER CODE BEGIN GPDMA1_Channel11_IRQn 0 */
+    /* USER CODE BEGIN GPDMA1_Channel11_IRQn 0 */
 
-  /* USER CODE END GPDMA1_Channel11_IRQn 0 */
-  HAL_DMA_IRQHandler(&handle_GPDMA1_Channel11);
-  /* USER CODE BEGIN GPDMA1_Channel11_IRQn 1 */
+    /* USER CODE END GPDMA1_Channel11_IRQn 0 */
+    HAL_DMA_IRQHandler(&handle_GPDMA1_Channel11);
+    /* USER CODE BEGIN GPDMA1_Channel11_IRQn 1 */
 
-  /* USER CODE END GPDMA1_Channel11_IRQn 1 */
+    /* USER CODE END GPDMA1_Channel11_IRQn 1 */
 }
 
 /**
  * @brief This function handles Serial Audio Interface 1 global interrupt.
  */
 void SAI1_IRQHandler(void) {
-  /* USER CODE BEGIN SAI1_IRQn 0 */
+    /* USER CODE BEGIN SAI1_IRQn 0 */
 
-  /* USER CODE END SAI1_IRQn 0 */
-  HAL_SAI_IRQHandler(&hsai_BlockA1);
-  /* USER CODE BEGIN SAI1_IRQn 1 */
+    /* USER CODE END SAI1_IRQn 0 */
+    HAL_SAI_IRQHandler(&hsai_BlockA1);
+    /* USER CODE BEGIN SAI1_IRQn 1 */
 
-  /* USER CODE END SAI1_IRQn 1 */
+    /* USER CODE END SAI1_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
