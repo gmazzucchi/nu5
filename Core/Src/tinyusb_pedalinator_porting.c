@@ -13,9 +13,9 @@ void board_led_write(bool led_state) {
 uint32_t board_millis(void) { return HAL_GetTick(); }
 
 enum {
-  BLINK_NOT_MOUNTED = 250,
+  BLINK_NOT_MOUNTED = 50,
   BLINK_MOUNTED = 1000,
-  BLINK_SUSPENDED = 2500,
+  BLINK_SUSPENDED = 5000,
 };
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
@@ -59,27 +59,6 @@ void tud_resume_cb(void) {
 //--------------------------------------------------------------------+
 // USB CDC
 //--------------------------------------------------------------------+
-void cdc_task(void) {
-  // connected() check for DTR bit
-  // Most but not all terminal client set this when making connection
-  // if ( tud_cdc_connected() )
-  {
-    // connected and there are data available
-    if (tud_cdc_available()) {
-      // read data
-      char buf[64];
-      uint32_t count = tud_cdc_read(buf, sizeof(buf));
-      (void)count;
-
-      // Echo back
-      // Note: Skip echo by commenting out write() and write_flush()
-      // for throughput test e.g
-      //    $ dd if=/dev/zero of=/dev/ttyACM0 count=10000
-      tud_cdc_write(buf, count);
-      tud_cdc_write_flush();
-    }
-  }
-}
 
 // Invoked when cdc when line state changed e.g connected/disconnected
 void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts) {

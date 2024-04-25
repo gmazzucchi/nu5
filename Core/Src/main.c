@@ -517,14 +517,19 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base,
   long double ratio = powl(2.0, dsem / 12.0);
   size_t L = (size_t)((double)base_len / ratio);
   if (curr_max_len < L) {
+    // TODO: better error handling
     Error_Handler();
   }
+  // TODO: try different interpolation functions from the arm_math.h library
+  // arm_linear_interp_instance_f32 config;
+  // arm_linear_interp_f32(&config, 0.0f);
   for (size_t i = 0; i < L; i++) {
     double x = (double)i * ratio;
     double y = x - (size_t)x;
     size_t z = (size_t)x % base_len;
     curr[i] = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
   }
+  // TODO: implement also time_stretching
   return L;
 }
 
@@ -574,7 +579,20 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
     }
   }
 }
+#endif
 
+#ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
+uint32_t prevtime = 0;
+
+void cdc_task(void) {
+  const char i_am_alive_msg[]="I am alive\r\n";
+  if (tud_cdc_write_available() && (HAL_GetTick() - prevtime) > 500) {
+    prevtime = HAL_GetTick();
+    HAL_UART_Transmit(&huart1, (uint8_t*) i_am_alive_msg, sizeof(i_am_alive_msg), 100);
+    tud_cdc_write_str(i_am_alive_msg);
+    tud_cdc_write_flush();
+  }  
+}
 #endif
 
 /* USER CODE END 0 */
@@ -739,6 +757,7 @@ int main(void) {
     tud_task(); // device task
     led_blinking_task();
     cdc_task();
+    
 #endif
 
 #ifdef PEDALINATOR_PITCH_MODULATION

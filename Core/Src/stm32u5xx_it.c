@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "tusb.h"
+#include "pedalinator_config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
