@@ -491,8 +491,10 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
 }
 #endif
 
-#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
-#include "sample_22kHz_D1.h"
+#if defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
+#include "sample_22kHz_D2.h"
+
+uint32_t log_prevtime = 0;
 
 /* // WORKING PYTHON ALGORITHM
  lp = LOOP_POINT_DATA[sample]["lp_start"]
@@ -558,29 +560,33 @@ size_t min(size_t x, size_t y) {
 }
 
 bool dma_transfer_completed = false;
+bool dma_is_transmitting    = false;
 void pedalinator_dma_completed_transfer_cb(DMA_HandleTypeDef *const hdma) {
     if (hdma == &handle_GPDMA1_Channel11) {
         dma_transfer_completed = true;
+        dma_is_transmitting    = false;
     }
 }
 
 void pedalinator_dma_error_cb(DMA_HandleTypeDef *const hdma) {
-    HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
     Error_Handler();
 }
 
 void pedalinator_dma_abort_cb(DMA_HandleTypeDef *const hdma) {
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    Error_Handler();
 }
 
 void pedalinator_dma_suspend_cb(DMA_HandleTypeDef *const hdma) {
-    // HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-    // HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_SET);
+    print("pedalinator_dma_suspend_cb callback called...\r\n");
 }
 
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
     if (hsai == &hsai_BlockA1) {
         dma_transfer_completed = true;
+        dma_is_transmitting    = false;
     }
 }
 
@@ -598,6 +604,12 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
         }
     }
 }
+
+size_t compose_note(int nstate, int16_t *current_note, size_t current_note_max_len) {
+    memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    return SAMPLE_D2_22KHZ_CORPO_L;
+}
+
 #endif
 
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
@@ -719,7 +731,7 @@ int main(void) {
     // int16_t c_decay[];
 #endif
 
-#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
+#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA
 #define C_CORPO_MAX_L 50000
     int16_t c_corpo[C_CORPO_MAX_L] = {0};
     memset(c_corpo, 0, C_CORPO_MAX_L * sizeof(int16_t));
@@ -730,6 +742,61 @@ int main(void) {
     // size_t c_adder_len = SAMPLE_D2_22KHZ_CORPO_L;
     int pstate = 0;
 
+    HAL_StatusTypeDef result;
+
+    result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_CPLT_CB_ID, pedalinator_dma_completed_transfer_cb);
+    if (result != HAL_OK) {
+        Error_Handler();
+    }
+
+    result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_ERROR_CB_ID, pedalinator_dma_error_cb);
+    if (result != HAL_OK) {
+        Error_Handler();
+    }
+
+    result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_ABORT_CB_ID, pedalinator_dma_abort_cb);
+    if (result != HAL_OK) {
+        Error_Handler();
+    }
+
+    result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_SUSPEND_CB_ID, pedalinator_dma_suspend_cb);
+    if (result != HAL_OK) {
+        Error_Handler();
+    }
+#endif
+
+#ifdef PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA
+    int16_t c_attacco[C_ATTACCO_MAX_L];
+    memset(c_attacco, 0, C_ATTACCO_MAX_L * sizeof(int16_t));
+    size_t c_attacco_len = 0;
+
+    int16_t c_corpo[C_CORPO_MAX_L];
+    memset(c_corpo, 0, C_CORPO_MAX_L * sizeof(int16_t));
+    size_t c_corpo_len = 0;
+
+    int16_t c_decay[C_DECAY_MAX_L];
+    memset(c_decay, 0, C_DECAY_MAX_L * sizeof(int16_t));
+    size_t c_decay_len = 0;
+
+    int16_t current_note[CURRENT_NOTE_L];
+    memset(current_note, 0, CURRENT_NOTE_L * sizeof(int16_t));
+    size_t current_note_len = 0;
+
+    int16_t buffer0_sai[CURRENT_NOTE_L];
+    memset(buffer0_sai, 0, CURRENT_NOTE_L * sizeof(int16_t));
+    size_t buffer0_sai_len = 0;
+
+    int16_t buffer1_sai[CURRENT_NOTE_L];
+    memset(buffer1_sai, 0, CURRENT_NOTE_L * sizeof(int16_t));
+    size_t buffer1_sai_len = 0;
+
+    int16_t *doublebuffer_sai[2]    = {buffer0_sai, buffer1_sai};
+    size_t *doublebuffer_sai_len[2] = {&buffer0_sai_len, &buffer1_sai_len};
+
+    bool ready_to_play_note = true;
+    bool has_to_play_note   = false;
+    bool active_buffer_sai  = 0;
+    int pstate              = 0b1111;
     HAL_StatusTypeDef result;
 
     result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_CPLT_CB_ID, pedalinator_dma_completed_transfer_cb);
@@ -766,7 +833,7 @@ int main(void) {
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
         tud_task();  // device task
         led_blinking_task();
-        cdc_task();
+        // cdc_task();
 
 #endif
 
@@ -842,7 +909,7 @@ int main(void) {
         }
 #endif
 
-#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_NO_DMA
+#ifdef PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA
         /*
     SOMETHING WORKS!!!
 
@@ -901,6 +968,69 @@ int main(void) {
             HAL_SAI_DMAStop(&hsai_BlockA1);
         }
 
+#endif
+
+#ifdef PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA
+        GPIO_PinState n1 = HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
+        GPIO_PinState n2 = HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
+        GPIO_PinState n3 = HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
+        GPIO_PinState n4 = HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
+        int nstate       = n1 | n2 << 1 | n3 << 2 | n4 << 3;
+#define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
+        if (HAL_GetTick() - log_prevtime > 500) {
+            print(
+                "%d|%d|%d|%d; dma_transfer_completed=%d\r\n",
+                PINSTATE_TO_INT(n1),
+                PINSTATE_TO_INT(n2),
+                PINSTATE_TO_INT(n3),
+                PINSTATE_TO_INT(n4),
+                (int)dma_transfer_completed);
+            log_prevtime = HAL_GetTick();
+        }
+
+        __disable_irq();
+        if (dma_transfer_completed || (!has_to_play_note && dma_is_transmitting)) {
+            HAL_SAI_DMAStop(&hsai_BlockA1);
+            dma_transfer_completed = false;
+            dma_is_transmitting    = false;
+            ready_to_play_note     = true;
+            // ok to start another note
+            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+        }
+        // se qua scatta l'interrupt della callback siamo fregati
+        if (ready_to_play_note && has_to_play_note) {
+            ready_to_play_note  = false;
+            dma_is_transmitting = true;
+            HAL_SAI_Transmit_DMA(
+                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t) * (doublebuffer_sai_len[active_buffer_sai]));
+            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        }
+        __enable_irq();
+
+        if (pstate == 0b1111 && nstate == 0b1111) {
+            // np to np
+            // ensure that no note is played
+            has_to_play_note = false;
+        }
+        // else if (pstate == 0b1111 && nstate != 0b1111) { // Covered in the last case
+        // }
+        else if (pstate != 0b1111 && nstate == 0b1111) {
+            // p to np
+            // stop at the next iteration
+            has_to_play_note = false;
+        } else if (pstate == nstate) {
+            // p same note
+            // continue with the same buffer
+            has_to_play_note = true;
+        } else {
+            // np to p
+            // p different note
+            // construct the note in the inactive buffer and then swap the buffer at the next iteration
+            has_to_play_note                           = true;
+            active_buffer_sai                          = !active_buffer_sai;
+            *(doublebuffer_sai_len[active_buffer_sai]) = compose_note(nstate, doublebuffer_sai[active_buffer_sai], CURRENT_NOTE_L);
+        }
+        pstate = nstate;
 #endif
 
 #ifdef TEST_INTERRUPTS
