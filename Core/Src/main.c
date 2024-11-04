@@ -493,6 +493,7 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
 
 #if defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
 #include "sample_22kHz_D2.h"
+#include "sample_22kHz_D1.h"
 
 uint32_t log_prevtime = 0;
 
@@ -520,12 +521,11 @@ int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base, size_t
     }
     double ratio = pow(2.0, dsem / 12.0);
     size_t L     = base_len / ratio;
-    size_t IL    = base_len;
     for (size_t i = 0; i < L; i++) {
         double x = i * ratio;
         size_t y = (size_t)x;
-        size_t z = (size_t)x % IL;
-        curr[i]  = base[z] * (1 - y) + base[(z + 1) % IL] * y;
+        size_t z = (size_t)x % base_len;
+        curr[i]  = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
     }
     return 0;
 }
@@ -554,17 +554,17 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
     return L;
 }
 
-size_t min(size_t x, size_t y) {
-    size_t res = x > y ? y : x;
-    return res;
+inline size_t min(size_t x, size_t y) {
+    return (x > y) ? (y) : (x);
 }
 
-bool dma_transfer_completed = false;
-bool dma_is_transmitting    = false;
+volatile bool dma_transfer_completed = false;
+volatile bool dma_is_transmitting    = false;
 void pedalinator_dma_completed_transfer_cb(DMA_HandleTypeDef *const hdma) {
     if (hdma == &handle_GPDMA1_Channel11) {
-        dma_transfer_completed = true;
-        dma_is_transmitting    = false;
+        // print("pedalinator_dma_completed_transfer_cb callback called...\r\n");
+        // dma_transfer_completed = true;
+        // dma_is_transmitting    = false;
     }
 }
 
@@ -585,13 +585,23 @@ void pedalinator_dma_suspend_cb(DMA_HandleTypeDef *const hdma) {
 
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
     if (hsai == &hsai_BlockA1) {
+        print("HAL_SAI_TxCpltCallback callback called...\r\n");
         dma_transfer_completed = true;
         dma_is_transmitting    = false;
     }
 }
 
+volatile bool half_transfer = true;
+
+void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef *hsai){
+    if (hsai == &hsai_BlockA1) {
+        print("HAL_SAI_TxHalfCpltCallback callback called...\r\n");
+        half_transfer = true;
+    }
+}
+
 void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
-    return;
+    return;  // TODO: fix this
     if (hsai == &hsai_BlockA1) {
         uint32_t prevtime = HAL_GetTick();
         while (1) {
@@ -790,6 +800,11 @@ int main(void) {
     memset(buffer1_sai, 0, CURRENT_NOTE_L * sizeof(int16_t));
     size_t buffer1_sai_len = 0;
 
+    buffer0_sai_len = SAMPLE_D2_22KHZ_CORPO_L;
+    buffer1_sai_len = SAMPLE_D2_22KHZ_CORPO_L;
+    memcpy(buffer0_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    memcpy(buffer1_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+
     int16_t *doublebuffer_sai[2]    = {buffer0_sai, buffer1_sai};
     size_t *doublebuffer_sai_len[2] = {&buffer0_sai_len, &buffer1_sai_len};
 
@@ -975,7 +990,7 @@ int main(void) {
         GPIO_PinState n2 = HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
         GPIO_PinState n3 = HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
         GPIO_PinState n4 = HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
-        int nstate       = n1 | n2 << 1 | n3 << 2 | n4 << 3;
+        int nstate       = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3);
 #define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
         if (HAL_GetTick() - log_prevtime > 500) {
             print(
