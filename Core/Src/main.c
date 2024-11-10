@@ -26,6 +26,7 @@
 #include "icache.h"
 #include "memorymap.h"
 #include "sai.h"
+#include "spi.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_otg.h"
@@ -434,69 +435,9 @@ void elaborate_decay(int16_t *corpo, size_t corpo_len, int16_t *decay, size_t de
 
 #endif
 
-#ifdef PEDALINATOR_ADVANCED_PITCH_MODULATION
+#if defined(PEDALINATOR_ADVANCED_PITCH_MODULATION) || defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || \
+    defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
 #include "sample_22kHz_D2.h"
-
-/* // WORKING PYTHON ALGORITHM
- lp = LOOP_POINT_DATA[sample]["lp_start"]
-ls = LOOP_POINT_DATA[sample]["lp_stop"]
-(frames, nframes) = soundfile.read(sample + ".wav")
-attacco_frames = frames[:lp]
-corpo_frames = frames[lp:ls]
-dsem = 4
-ratio = 2**(dsem/12)
-IL = len(corpo_frames)
-L = math.trunc(len(corpo_frames) / ratio)
-corpo_frames_2 = [0] * L
-for i in range(0, L):
-    x = (i * ratio)
-    y = x - math.trunc(x)
-    z = math.trunc(x) % IL
-    corpo_frames_2[i] = corpo_frames[z] * \
-        (1 - y) + corpo_frames[(z + 1) % IL] * y */
-
-int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base, size_t base_len, int dsem) {
-    if (dsem == 0) {
-        return 0;
-    }
-    double ratio = pow(2.0, dsem / 12.0);
-    size_t L     = base_len / ratio;
-    size_t IL    = base_len;
-    for (size_t i = 0; i < L; i++) {
-        double x = i * ratio;
-        size_t y = (size_t)x;
-        size_t z = (size_t)x % IL;
-        curr[i]  = base[z] * (1 - y) + base[(z + 1) % IL] * y;
-    }
-    return 0;
-}
-
-// returns the new current note length
-size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, size_t base_len, int dsem) {
-    if (dsem == 0) {
-        return 0;
-    }
-    long double ratio = powl(2.0, dsem / 12.0);
-    size_t L          = (size_t)((double)base_len / ratio);
-    if (curr_max_len < L) {
-        Error_Handler();
-    }
-    for (size_t i = 0; i < L; i++) {
-        double x = (double)i * ratio;
-        double y = x - (size_t)x;
-        size_t z = (size_t)x % base_len;
-        curr[i]  = base[z] * (1 - y) + base[(z + 1) % base_len] * y;
-    }
-    return L;
-}
-#endif
-
-#if defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
-#include "sample_22kHz_D2.h"
-#include "sample_22kHz_D1.h"
-
-uint32_t log_prevtime = 0;
-
 /* // WORKING PYTHON ALGORITHM
  lp = LOOP_POINT_DATA[sample]["lp_start"]
 ls = LOOP_POINT_DATA[sample]["lp_stop"]
@@ -533,7 +474,11 @@ int attacco_pitch_shifting(int16_t *curr, size_t curr_len, int16_t *base, size_t
 // returns the new current note length
 size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, size_t base_len, int dsem) {
     if (dsem == 0) {
-        return 0;
+        if (curr_max_len < base_len) {
+            return 0;
+        }
+        memcpy(curr, base, base_len);
+        return base_len;
     }
     long double ratio = powl(2.0, dsem / 12.0);
     size_t L          = (size_t)((double)base_len / ratio);
@@ -544,6 +489,12 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
     // TODO: try different interpolation functions from the arm_math.h library
     // arm_linear_interp_instance_f32 config;
     // arm_linear_interp_f32(&config, 0.0f);
+    // arm_linear_interp_instance_f32 instance = {
+    //     .nValues = L,
+    //     .pYData = base, // technically double = float64
+    //     .x1 = 1,
+    //     .xSpacing = 1
+    // };
     for (size_t i = 0; i < L; i++) {
         double x = (double)i * ratio;
         double y = x - (size_t)x;
@@ -553,18 +504,29 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
     // TODO: implement also time_stretching
     return L;
 }
+#endif
+
+#if defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
+#include "sample_22kHz_D1.h"
+
+uint32_t log_prevtime = 0;
 
 inline size_t min(size_t x, size_t y) {
     return (x > y) ? (y) : (x);
 }
 
-volatile bool dma_transfer_completed = false;
-volatile bool dma_is_transmitting    = false;
+volatile bool sai_transfer_completed      = false;
+volatile bool sai_is_transmitting         = false;
+volatile bool sai_half_transfer_completed = false;
+
 void pedalinator_dma_completed_transfer_cb(DMA_HandleTypeDef *const hdma) {
     if (hdma == &handle_GPDMA1_Channel11) {
-        // print("pedalinator_dma_completed_transfer_cb callback called...\r\n");
-        // dma_transfer_completed = true;
-        // dma_is_transmitting    = false;
+        /***
+         * // NOT NEEDED
+         * print("pedalinator_dma_completed_transfer_cb callback called...\r\n");
+         * dma_transfer_completed = true;
+         * dma_is_transmitting    = false; 
+        */
     }
 }
 
@@ -586,17 +548,15 @@ void pedalinator_dma_suspend_cb(DMA_HandleTypeDef *const hdma) {
 void HAL_SAI_TxCpltCallback(SAI_HandleTypeDef *hsai) {
     if (hsai == &hsai_BlockA1) {
         print("HAL_SAI_TxCpltCallback callback called...\r\n");
-        dma_transfer_completed = true;
-        dma_is_transmitting    = false;
+        sai_transfer_completed = true;
+        sai_is_transmitting    = false;
     }
 }
 
-volatile bool half_transfer = true;
-
-void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef *hsai){
+void HAL_SAI_TxHalfCpltCallback(SAI_HandleTypeDef *hsai) {
     if (hsai == &hsai_BlockA1) {
         print("HAL_SAI_TxHalfCpltCallback callback called...\r\n");
-        half_transfer = true;
+        sai_half_transfer_completed = true;
     }
 }
 
@@ -615,9 +575,68 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
     }
 }
 
-size_t compose_note(int nstate, int16_t *current_note, size_t current_note_max_len) {
-    memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
-    return SAMPLE_D2_22KHZ_CORPO_L;
+/**
+ * @brief Given the set of keys, it composes the waveform data to be played via I2S
+ * 
+ * @param nstate The bitset for the current set of keys pressed
+ * @param pstate The bitset for the previous set of keys pressed
+ * @param current_note Frame of the note
+ * @param current_note_max_len Maximum length for the note frame
+ * @return size_t 
+ */
+size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
+    // placeholder
+    // memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // return SAMPLE_D2_22KHZ_CORPO_L;
+
+    /***
+     * pstate 0110111
+     * nstate 1010011
+     * 
+     * keep_n 0010011
+     * new_ns 1000100
+     * old_ns 0100100
+     */
+    unsigned int keep_notes = nstate & pstate;      // do the corpo
+    unsigned int new_notes  = nstate ^ keep_notes;  // do the attacco
+    unsigned int old_noted  = pstate ^ keep_notes;  // do the rilascio
+    int16_t tmp_adder[CURRENT_NOTE_L];
+    size_t tmp_adder_sz;
+
+    memset(current_note, 0, current_note_max_len);
+
+    print("%d - %d\r\n", keep_notes, new_notes);
+    print("semitones = ");
+
+    for (size_t isem = 0; isem < 12; isem++) {
+        // if ((nstate >> isem) & 1) {
+        // print("%lu", isem);
+        // }
+        if ((keep_notes >> isem) & 1 || (new_notes >> isem) & 1) {
+            tmp_adder_sz         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+            current_note_max_len = min(current_note_max_len, tmp_adder_sz);
+            for (size_t inote = 0; inote < current_note_max_len; inote++) {
+                current_note[inote] += tmp_adder[inote];
+            }
+        }
+        /* 
+            if ((keep_notes >> isem) & 1) {
+                tmp_adder_sz = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+                current_note_max_len = min(current_note_max_len, tmp_adder_sz);
+                for (size_t inote = 0; inote < current_note_max_len; inote++) {
+                    current_note[inote] += tmp_adder[inote];
+                }
+            } else if ((new_notes >> isem) & 1) {
+                // tmp_adder_sz = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+            } else if ((old_noted >> isem) & 1) {
+
+            } 
+        */
+    }
+
+    print("\r\n");
+
+    return current_note_max_len;
 }
 
 #endif
@@ -676,6 +695,7 @@ int main(void) {
     MX_SAI1_Init();
     MX_TIM1_Init();
     MX_DAC1_Init();
+    MX_SPI1_Init();
     /* USER CODE BEGIN 2 */
 
 #ifdef TEST_TIMER
@@ -691,6 +711,11 @@ int main(void) {
 
 #ifdef TEST_INTERRUPTS
     uint32_t firstts = HAL_GetTick();
+#endif
+
+#if defined(LCD_1602A_ENABLED)
+    lcd_1602a_init();
+    lcd_1602a_test();
 #endif
 
 #ifdef PEDALINATOR_PITCH_MODULATION
@@ -794,25 +819,27 @@ int main(void) {
 
     int16_t buffer0_sai[CURRENT_NOTE_L];
     memset(buffer0_sai, 0, CURRENT_NOTE_L * sizeof(int16_t));
-    size_t buffer0_sai_len = 0;
 
     int16_t buffer1_sai[CURRENT_NOTE_L];
     memset(buffer1_sai, 0, CURRENT_NOTE_L * sizeof(int16_t));
-    size_t buffer1_sai_len = 0;
 
-    buffer0_sai_len = SAMPLE_D2_22KHZ_CORPO_L;
-    buffer1_sai_len = SAMPLE_D2_22KHZ_CORPO_L;
-    memcpy(buffer0_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
-    memcpy(buffer1_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // memcpy(buffer0_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // memcpy(buffer1_sai, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // memcpy(buffer0_sai + sizeof(uint8_t) * SAMPLE_D2_22KHZ_CORPO_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // memcpy(buffer1_sai + sizeof(uint8_t) * SAMPLE_D2_22KHZ_CORPO_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
 
-    int16_t *doublebuffer_sai[2]    = {buffer0_sai, buffer1_sai};
-    size_t *doublebuffer_sai_len[2] = {&buffer0_sai_len, &buffer1_sai_len};
+    // int16_t *doublebuffer_sai[2]    = {buffer0_sai, buffer1_sai};
+    // size_t doublebuffer_sai_len[2] =  {SAMPLE_D2_22KHZ_CORPO_L, SAMPLE_D2_22KHZ_CORPO_L};
 
-    bool ready_to_play_note = true;
-    bool has_to_play_note   = false;
-    bool active_buffer_sai  = 0;
-    int pstate              = 0b1111;
-    HAL_StatusTypeDef result;
+    int16_t *doublebuffer_sai[2]   = {buffer0_sai, buffer1_sai};
+    size_t doublebuffer_sai_len[2] = {0, 0};
+
+    bool ready_to_play_note   = true;
+    bool has_to_play_note     = false;
+    uint8_t active_buffer_sai = 0;
+    // uint8_t inactive_buffer_sai  = 1;
+    uint32_t pstate          = 0b1111;
+    HAL_StatusTypeDef result = HAL_OK;
 
     result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_CPLT_CB_ID, pedalinator_dma_completed_transfer_cb);
     if (result != HAL_OK) {
@@ -986,50 +1013,99 @@ int main(void) {
 #endif
 
 #ifdef PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA
-        GPIO_PinState n1 = HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
-        GPIO_PinState n2 = HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
-        GPIO_PinState n3 = HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
-        GPIO_PinState n4 = HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
-        int nstate       = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3);
+
+#warning TODO Software debounce
+        GPIO_PinState n1 = !HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
+        GPIO_PinState n2 = !HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
+        GPIO_PinState n3 = !HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
+        GPIO_PinState n4 = !HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
+        uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3);
+
 #define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
         if (HAL_GetTick() - log_prevtime > 500) {
             print(
-                "%d|%d|%d|%d; dma_transfer_completed=%d\r\n",
+                "%d|%d|%d|%d; sai_half_transfer_completed=%d\r\n",
                 PINSTATE_TO_INT(n1),
                 PINSTATE_TO_INT(n2),
                 PINSTATE_TO_INT(n3),
                 PINSTATE_TO_INT(n4),
-                (int)dma_transfer_completed);
+                (int)sai_half_transfer_completed);
             log_prevtime = HAL_GetTick();
         }
 
-        __disable_irq();
-        if (dma_transfer_completed || (!has_to_play_note && dma_is_transmitting)) {
+        /* 
+            WARNING: beware of the SAI interrupts, maybe disabling IRQ is not needed
+            __disable_irq();
+            if (sai_transfer_completed) {
+                // HAL_SAI_DMAStop(&hsai_BlockA1); // maybe not needed
+                sai_transfer_completed = false;
+                // sai_is_transmitting    = false; // not needed
+                ready_to_play_note     = true;
+                // ok to start another note
+                HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            if (sai_half_transfer_completed && sai_is_transmitting) {
+            // if (sai_transfer_completed || (!has_to_play_note && sai_is_transmitting)) {
+
+                HAL_SAI_DMAStop(&hsai_BlockA1);
+                sai_half_transfer_completed = false;
+                ready_to_play_note     = true;
+                // ok to start another note
+                HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
+            }
+            if (ready_to_play_note && has_to_play_note) {
+                ready_to_play_note  = false;
+                sai_is_transmitting = true;
+                active_buffer_sai = !active_buffer_sai;
+                HAL_SAI_Transmit_DMA(&hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t) * (doublebuffer_sai_len[active_buffer_sai]));
+                HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+            }
+
+            sai_half_transfer_completed
+            sai_transfer_completed
+            sai_is_transmitting
+            ready_to_play_note
+            has_to_play_note
+        */
+
+        if (!has_to_play_note && sai_is_transmitting) {
+            // stop the sound
             HAL_SAI_DMAStop(&hsai_BlockA1);
-            dma_transfer_completed = false;
-            dma_is_transmitting    = false;
-            ready_to_play_note     = true;
-            // ok to start another note
+            sai_half_transfer_completed = false;
+            sai_transfer_completed      = false;
+            sai_is_transmitting         = false;
+
+            ready_to_play_note = true;
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-        }
-        // se qua scatta l'interrupt della callback siamo fregati
-        if (ready_to_play_note && has_to_play_note) {
-            ready_to_play_note  = false;
-            dma_is_transmitting = true;
+        } else if (has_to_play_note && sai_half_transfer_completed) {
+            HAL_SAI_DMAStop(&hsai_BlockA1);
+            sai_half_transfer_completed = false;
+
+            // active_buffer_sai = !active_buffer_sai;
             HAL_SAI_Transmit_DMA(
-                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t) * (doublebuffer_sai_len[active_buffer_sai]));
+                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
+            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        } else if (has_to_play_note && ready_to_play_note) {
+            ready_to_play_note  = false;
+            sai_is_transmitting = true;
+
+            active_buffer_sai = !active_buffer_sai;
+            HAL_SAI_Transmit_DMA(
+                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
         }
-        __enable_irq();
 
-        if (pstate == 0b1111 && nstate == 0b1111) {
+        // __enable_irq();
+
+#define ALL_KEYS_RELEASED (0b0000)
+        if (pstate == ALL_KEYS_RELEASED && nstate == ALL_KEYS_RELEASED) {
             // np to np
             // ensure that no note is played
             has_to_play_note = false;
         }
         // else if (pstate == 0b1111 && nstate != 0b1111) { // Covered in the last case
         // }
-        else if (pstate != 0b1111 && nstate == 0b1111) {
+        else if (pstate != ALL_KEYS_RELEASED && nstate == ALL_KEYS_RELEASED) {
             // p to np
             // stop at the next iteration
             has_to_play_note = false;
@@ -1037,13 +1113,13 @@ int main(void) {
             // p same note
             // continue with the same buffer
             has_to_play_note = true;
+            // memcpy(doublebuffer_sai[!active_buffer_sai], doublebuffer_sai[active_buffer_sai], doublebuffer_sai_len[active_buffer_sai]);
         } else {
             // np to p
             // p different note
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
-            has_to_play_note                           = true;
-            active_buffer_sai                          = !active_buffer_sai;
-            *(doublebuffer_sai_len[active_buffer_sai]) = compose_note(nstate, doublebuffer_sai[active_buffer_sai], CURRENT_NOTE_L);
+            has_to_play_note                         = true;
+            doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
         }
         pstate = nstate;
 #endif
