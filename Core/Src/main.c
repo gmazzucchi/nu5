@@ -715,7 +715,8 @@ int main(void) {
 
 #if defined(LCD_1602A_ENABLED)
     lcd_1602a_init();
-    lcd_1602a_test();
+    // lcd_1602a_test();
+    lcd_1602a_write_text("pedalinator v1");
 #endif
 
 #ifdef PEDALINATOR_PITCH_MODULATION
