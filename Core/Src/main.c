@@ -575,6 +575,38 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
     }
 }
 
+static inline float hanning_window(size_t i, size_t N) {
+    return 0.5f * (1.0f - cosf(2.0f * PI * (float)i / (float)N));
+}
+
+/***
+ * Applying a window crossfade to smoothen the sound wave
+ * VERY POOR RESULTS!!!
+ */
+size_t apply_window_crossfading(int16_t *current_note, size_t current_note_length) {
+    // crossfading algorithm
+    // output[i] = w[i] × sample2[i] + (1−w[i]) × sample1[i]
+    size_t crossfading_len = current_note_length / 4;
+    for (size_t isample = 0; isample < crossfading_len; isample++) {
+        float res = hanning_window(isample, crossfading_len) * (float)current_note[isample] + (1.0f - hanning_window(isample, crossfading_len)) * (float)current_note[current_note_length - isample - 1];
+        current_note[isample] = current_note[current_note_length - isample - 1] = (int16_t) res;
+    }
+    return current_note_length;
+}
+
+/***
+ * The algorithm could have one flaw: it should be averaging the edges of the sample
+ */
+size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_length) {
+    // output[i]=(1−Ni​)×sample1[i]+Ni​×sample2[i]
+    size_t N = current_note_length / 2;
+    for (size_t i = 0; i < N; i++) {
+        float res = (1 - (float) i / (float) N) * (float) current_note[i] + 1.0f / (float) N * (float) current_note[N - i - 1];
+        current_note[i] = current_note[current_note_length - i - 1] = (uint16_t) res;
+    }
+    return current_note_length;
+}
+
 /**
  * @brief Given the set of keys, it composes the waveform data to be played via I2S
  * 
@@ -586,8 +618,10 @@ void HAL_SAI_ErrorCallback(SAI_HandleTypeDef *hsai) {
  */
 size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
     // placeholder
-    // memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+
+    memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
     // return SAMPLE_D2_22KHZ_CORPO_L;
+    return apply_linear_crossfading(current_note, SAMPLE_D2_22KHZ_CORPO_L); // doesn't sound good...
 
     /***
      * pstate 0110111
