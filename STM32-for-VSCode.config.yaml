@@ -37,6 +37,7 @@ cFlags:
   - -Wall
   - -fdata-sections
   - -ffunction-sections
+  - -DARM_MATH_DSP
 
 cxxFlags: []
 assemblyFlags: 
@@ -94,6 +95,9 @@ sourceFiles:
   - Middlewares/**/*.c
   - USBX/**/*.c
   - Core/Lib/tinyusb/src/**/*.c
+  - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_add_q15.c
+  - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_scale_q15.c
+  # - Drivers/CMSIS/DSP/Source/**/*.c
 
 
 # When no makefile is present it will show a warning pop-up.

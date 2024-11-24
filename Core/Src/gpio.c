@@ -107,14 +107,8 @@ void MX_GPIO_Init(void) {
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(USER_SWITCH_GPIO_Port, &GPIO_InitStruct);
 
-    /*Configure GPIO pin : PtPin */
-    GPIO_InitStruct.Pin  = NOTA5_Pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(NOTA5_GPIO_Port, &GPIO_InitStruct);
-
-    /*Configure GPIO pins : PEPin PEPin PEPin */
-    GPIO_InitStruct.Pin  = NOTA3_Pin | NOTA4_Pin | NOTA1_Pin;
+    /*Configure GPIO pins : PEPin PEPin PEPin PEPin */
+    GPIO_InitStruct.Pin  = NOTA5_Pin | NOTA3_Pin | NOTA4_Pin | NOTA1_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);

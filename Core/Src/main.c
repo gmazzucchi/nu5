@@ -42,6 +42,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
 #include "tinyusb_pedalinator_porting.h"
@@ -477,7 +478,7 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
         if (curr_max_len < base_len) {
             return 0;
         }
-        memcpy(curr, base, base_len);
+        memcpy(curr, base, base_len * sizeof(int16_t));
         return base_len;
     }
     long double ratio = powl(2.0, dsem / 12.0);
@@ -609,6 +610,10 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
     return current_note_length;
 }
 
+size_t time_stretching(tmp_adder, tmp_adder_len, chosen_time_stretching_target) {
+    
+}
+
 /**
  * @brief Given the set of keys, it composes the waveform data to be played via I2S
  * 
@@ -637,23 +642,43 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
     unsigned int new_notes  = nstate ^ keep_notes;  // do the attacco
     unsigned int old_noted  = pstate ^ keep_notes;  // do the rilascio
     int16_t tmp_adder[CURRENT_NOTE_L];
-    size_t tmp_adder_sz;
+    int16_t tmp_time_stretcher[CURRENT_NOTE_L];
+    size_t tmp_adder_len = 0;
+    size_t tmp_time_stretcher_len = 0;
 
     memset(current_note, 0, current_note_max_len);
 
-    print("%d - %d\r\n", keep_notes, new_notes);
-    print("semitones = ");
+    if (HAL_GetTick() - log_prevtime > 500) {
+        print(
+            "%d|%d|%d|%d|%d; \r\n",
+            (new_notes >> 0) & 1 || (keep_notes >> 0) & 1,
+            (new_notes >> 1) & 1 || (keep_notes >> 1) & 1,
+            (new_notes >> 2) & 1 || (keep_notes >> 2) & 1,
+            (new_notes >> 3) & 1 || (keep_notes >> 3) & 1,
+            (new_notes >> 4) & 1 || (keep_notes >> 4) & 1);
+        log_prevtime = HAL_GetTick();
+    }
+
+    size_t chosen_time_stretching_target = SAMPLE_D2_22KHZ_CORPO_L;
+    size_t n_notes = 0;
 
     for (size_t isem = 0; isem < 12; isem++) {
-        // if ((nstate >> isem) & 1) {
-        // print("%lu", isem);
-        // }
-        if ((keep_notes >> isem) & 1 || (new_notes >> isem) & 1) {
-            tmp_adder_sz         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
-            current_note_max_len = min(current_note_max_len, tmp_adder_sz);
-            for (size_t inote = 0; inote < current_note_max_len; inote++) {
-                current_note[inote] += tmp_adder[inote];
-            }
+        if (((new_notes >> isem) & 1) || ((keep_notes >> isem) & 1)) {
+            tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+            current_note_max_len = min(current_note_max_len, tmp_adder_len);
+            // time_stretching(tmp_time_stretcher, CURRENT_NOTE_L, tmp_adder, tmp_adder_len, chosen_time_stretching_target);
+
+            arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len); // time stretching
+            n_notes++;
+            // for (size_t i = 0; i < chosen_time_stretching_target; i++) {
+                // current_note[i] /= 2;
+            // }
+
+// #define ONE_HALF_SCALE 16384 // 0.5 in 1.15 format
+            // arm_scale_q15(current_note, ONE_HALF_SCALE, int8_t shift, q15_t *pDst, uint32_t blockSize);
+            // for (size_t inote = 0; inote < current_note_max_len; inote++) {
+                // current_note[inote] = tmp_adder[inote];
+            // }
         }
         /* 
             if ((keep_notes >> isem) & 1) {
@@ -671,6 +696,8 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
     }
 
     print("\r\n");
+    if (n_notes > 1)
+        arm_scale_q15(current_note, 0xFFFF / n_notes, 0, current_note, current_note_max_len);
 
     return current_note_max_len;
 }
@@ -733,6 +760,25 @@ int main(void) {
     MX_DAC1_Init();
     MX_SPI1_Init();
     /* USER CODE BEGIN 2 */
+
+/* 
+    #define TN 12
+    q15_t a[TN] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    // q15_t c[TN] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    q15_t c[TN] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    char bstr[BUFSIZ]; size_t to_add = 0; size_t ptr = 0;
+    while(1) {
+        arm_add_q15(a, c, c, TN);
+        for (size_t i = 0; i < TN; i++) {
+            to_add = snprintf(bstr + ptr, BUFSIZ - ptr - 1, "%" PRIu16 ", ", c[i]);
+            ptr += to_add;
+        }
+        print("%s\r\n", bstr);
+        memset(bstr, 0, ptr + 1);
+        ptr = 0;
+        HAL_Delay(500);
+    }
+ */
 
 #ifdef TEST_TIMER
     const char message[] = "Son vivo\r\n";
@@ -871,12 +917,30 @@ int main(void) {
     int16_t *doublebuffer_sai[2]   = {buffer0_sai, buffer1_sai};
     size_t doublebuffer_sai_len[2] = {0, 0};
 
+#define N_PEDALINATOR_NOTES (5) // MAX 31 NOTES
+    static GPIO_TypeDef *button_notes_ports[N_PEDALINATOR_NOTES] = {
+        NOTA1_GPIO_Port,
+        NOTA2_GPIO_Port,
+        NOTA3_GPIO_Port,
+        NOTA4_GPIO_Port,
+        NOTA5_GPIO_Port,
+    };
+
+    const static uint16_t button_notes_pins[N_PEDALINATOR_NOTES] = {
+        NOTA1_Pin,
+        NOTA2_Pin,
+        NOTA3_Pin,
+        NOTA4_Pin,
+        NOTA5_Pin,
+    };
+
     bool ready_to_play_note   = true;
     bool has_to_play_note     = false;
     uint8_t active_buffer_sai = 0;
     // bool first_half = true;
     // uint8_t inactive_buffer_sai  = 1;
-    uint32_t pstate          = 0b1111;
+    uint32_t pstate          = (1 << N_PEDALINATOR_NOTES) - 1;
+    uint32_t buffer_notes[2] = {0};
     HAL_StatusTypeDef result = HAL_OK;
 
     result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_CPLT_CB_ID, pedalinator_dma_completed_transfer_cb);
@@ -951,8 +1015,7 @@ int main(void) {
                 HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
                 Error_Handler();
             }
-            // memcpy(current_note_old, current_note, sizeof(int16_t) *
-            // current_note_len);
+            // memcpy(current_note_old, current_note, sizeof(int16_t) * current_note_len);
             print(
                 "attacco_len=%lu, corpo_len=%lu, decay_len=%lu, "
                 "current_note_len=%lu, current_note_old_len=%lu\r\n",
@@ -1053,23 +1116,33 @@ int main(void) {
 #ifdef PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA
 
 #warning TODO Software debounce
-        GPIO_PinState n1 = !HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
-        GPIO_PinState n2 = !HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
-        GPIO_PinState n3 = !HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
-        GPIO_PinState n4 = !HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
-        uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3);
+        // GPIO_PinState n1 = !HAL_GPIO_ReadPin(NOTA1_GPIO_Port, NOTA1_Pin);
+        // GPIO_PinState n2 = !HAL_GPIO_ReadPin(NOTA2_GPIO_Port, NOTA2_Pin);
+        // GPIO_PinState n3 = !HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
+        // GPIO_PinState n4 = !HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
+        // GPIO_PinState n5 = !HAL_GPIO_ReadPin(NOTA5_GPIO_Port, NOTA5_Pin);
+        uint32_t nstate = 0;
+        for (size_t inote = 0; inote < N_PEDALINATOR_NOTES; inote++) {
+            GPIO_PinState state = !HAL_GPIO_ReadPin(button_notes_ports[inote], button_notes_pins[inote]);
+            nstate |= (state << inote);
+        }
+
+        // uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3) | (n5 << 4);
 
 #define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
-        /*         if (HAL_GetTick() - log_prevtime > 500) {
+#if defined(PEDALINATOR_DEBUG_ENABLED)
+        if (HAL_GetTick() - log_prevtime > 500) {
             print(
-                "%d|%d|%d|%d; sai_half_transfer_completed=%d\r\n",
-                PINSTATE_TO_INT(n1),
-                PINSTATE_TO_INT(n2),
-                PINSTATE_TO_INT(n3),
-                PINSTATE_TO_INT(n4),
+                "%d|%d|%d|%d|%d; sai_half_transfer_completed=%d\r\n",
+                (nstate >> 0) & 1,
+                (nstate >> 1) & 1,
+                (nstate >> 2) & 1,
+                (nstate >> 3) & 1,
+                (nstate >> 4) & 1,
                 (int)sai_half_transfer_completed);
             log_prevtime = HAL_GetTick();
-        } */
+        }
+#endif
 
         /* 
             WARNING: beware of the SAI interrupts, maybe disabling IRQ is not needed
@@ -1119,12 +1192,29 @@ int main(void) {
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
         } else if (has_to_play_note && sai_transfer_completed) {
             // HAL_SAI_DMAStop(&hsai_BlockA1);
+            /* 
+                bool update_not_active_buffer = false;
+                // different note
+                if (buffer_notes[active_buffer_sai] != pstate) {
+                    update_not_active_buffer = true;
+                    active_buffer_sai = !active_buffer_sai;
+                    buffer_notes[!active_buffer_sai] = buffer_notes[active_buffer_sai] = pstate;
+                } 
+            */
 
             sai_transfer_completed = false;
             sai_is_transmitting    = true;
+            active_buffer_sai = !active_buffer_sai;
             HAL_SAI_Transmit_DMA(
                 &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+
+            /* 
+                if (update_not_active_buffer) {
+                    memcpy(doublebuffer_sai[!active_buffer_sai], doublebuffer_sai[active_buffer_sai], doublebuffer_sai_len[active_buffer_sai] * sizeof (int16_t));
+                    update_not_active_buffer = false;
+                } 
+            */
         } else if (has_to_play_note && ready_to_play_note) {
             ready_to_play_note  = false;
             sai_is_transmitting = true;
@@ -1137,7 +1227,7 @@ int main(void) {
 
         // __enable_irq();
 
-#define ALL_KEYS_RELEASED (0b0000)
+#define ALL_KEYS_RELEASED (0)
         if (pstate == ALL_KEYS_RELEASED && nstate == ALL_KEYS_RELEASED) {
             // np to np
             // ensure that no note is played
@@ -1153,13 +1243,14 @@ int main(void) {
             // p same note
             // continue with the same buffer
             has_to_play_note = true;
-            // memcpy(doublebuffer_sai[!active_buffer_sai], doublebuffer_sai[active_buffer_sai], doublebuffer_sai_len[active_buffer_sai]);
+            // memcpy(doublebuffer_sai[!active_buffer_sai], doublebuffer_sai[active_buffer_sai], doublebuffer_sai_len[active_buffer_sai] * sizeof(int16_t));
         } else {
             // np to p
             // p different note
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             has_to_play_note                         = true;
             doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            buffer_notes[!active_buffer_sai]         = nstate;
         }
         pstate = nstate;
 #endif
