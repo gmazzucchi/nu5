@@ -515,9 +515,9 @@ inline size_t min(size_t x, size_t y) {
     return (x > y) ? (y) : (x);
 }
 
-volatile bool sai_transfer_completed      = false;
-volatile bool sai_is_transmitting         = false;
-volatile bool sai_half_transfer_completed = false;
+static volatile bool sai_transfer_completed      = false;
+static volatile bool sai_is_transmitting         = false;
+static volatile bool sai_half_transfer_completed = false;
 
 void pedalinator_dma_completed_transfer_cb(DMA_HandleTypeDef *const hdma) {
     if (hdma == &handle_GPDMA1_Channel11) {
@@ -586,23 +586,25 @@ static inline float hanning_window(size_t i, size_t N) {
 size_t apply_window_crossfading(int16_t *current_note, size_t current_note_length) {
     // crossfading algorithm
     // output[i] = w[i] × sample2[i] + (1−w[i]) × sample1[i]
-    size_t crossfading_len = current_note_length / 4;
+    size_t crossfading_len = current_note_length / 48;
     for (size_t isample = 0; isample < crossfading_len; isample++) {
-        float res = hanning_window(isample, crossfading_len) * (float)current_note[isample] + (1.0f - hanning_window(isample, crossfading_len)) * (float)current_note[current_note_length - isample - 1];
-        current_note[isample] = current_note[current_note_length - isample - 1] = (int16_t) res;
+        float res = hanning_window(isample, crossfading_len) * (float)current_note[isample] +
+                    (1.0f - hanning_window(isample, crossfading_len)) * (float)current_note[current_note_length - isample - 1];
+        current_note[isample] = current_note[current_note_length - isample - 1] = (int16_t)res;
     }
     return current_note_length;
 }
 
 /***
  * The algorithm could have one flaw: it should be averaging the edges of the sample
+ * VERY POOR RESULTS!!!
  */
 size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_length) {
     // output[i]=(1−Ni​)×sample1[i]+Ni​×sample2[i]
-    size_t N = current_note_length / 2;
+    size_t N = current_note_length / 24;
     for (size_t i = 0; i < N; i++) {
-        float res = (1 - (float) i / (float) N) * (float) current_note[i] + 1.0f / (float) N * (float) current_note[N - i - 1];
-        current_note[i] = current_note[current_note_length - i - 1] = (uint16_t) res;
+        float res       = (1 - (float)i / (float)N) * (float)current_note[i] + 1.0f / (float)N * (float)current_note[N - i - 1];
+        current_note[i] = current_note[current_note_length - i - 1] = (uint16_t)res;
     }
     return current_note_length;
 }
@@ -619,9 +621,9 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
 size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
     // placeholder
 
-    memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L);
+    // memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L * sizeof(uint16_t));
     // return SAMPLE_D2_22KHZ_CORPO_L;
-    return apply_linear_crossfading(current_note, SAMPLE_D2_22KHZ_CORPO_L); // doesn't sound good...
+    // return apply_window_crossfading(current_note, SAMPLE_D2_22KHZ_CORPO_L); // doesn't sound good...
 
     /***
      * pstate 0110111
@@ -872,6 +874,7 @@ int main(void) {
     bool ready_to_play_note   = true;
     bool has_to_play_note     = false;
     uint8_t active_buffer_sai = 0;
+    // bool first_half = true;
     // uint8_t inactive_buffer_sai  = 1;
     uint32_t pstate          = 0b1111;
     HAL_StatusTypeDef result = HAL_OK;
@@ -1057,7 +1060,7 @@ int main(void) {
         uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3);
 
 #define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
-        if (HAL_GetTick() - log_prevtime > 500) {
+        /*         if (HAL_GetTick() - log_prevtime > 500) {
             print(
                 "%d|%d|%d|%d; sai_half_transfer_completed=%d\r\n",
                 PINSTATE_TO_INT(n1),
@@ -1066,7 +1069,7 @@ int main(void) {
                 PINSTATE_TO_INT(n4),
                 (int)sai_half_transfer_completed);
             log_prevtime = HAL_GetTick();
-        }
+        } */
 
         /* 
             WARNING: beware of the SAI interrupts, maybe disabling IRQ is not needed
@@ -1103,6 +1106,8 @@ int main(void) {
             has_to_play_note
         */
 
+        // __disable_irq();
+
         if (!has_to_play_note && sai_is_transmitting) {
             // stop the sound
             HAL_SAI_DMAStop(&hsai_BlockA1);
@@ -1112,13 +1117,13 @@ int main(void) {
 
             ready_to_play_note = true;
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET);
-        } else if (has_to_play_note && sai_half_transfer_completed) {
-            HAL_SAI_DMAStop(&hsai_BlockA1);
-            sai_half_transfer_completed = false;
+        } else if (has_to_play_note && sai_transfer_completed) {
+            // HAL_SAI_DMAStop(&hsai_BlockA1);
 
-            // active_buffer_sai = !active_buffer_sai;
+            sai_transfer_completed = false;
+            sai_is_transmitting    = true;
             HAL_SAI_Transmit_DMA(
-                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
+                &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
         } else if (has_to_play_note && ready_to_play_note) {
             ready_to_play_note  = false;
@@ -1126,7 +1131,7 @@ int main(void) {
 
             active_buffer_sai = !active_buffer_sai;
             HAL_SAI_Transmit_DMA(
-                &hsai_BlockA1, (uint8_t *)doublebuffer_sai[active_buffer_sai], (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
+                &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
         }
 

@@ -2,7 +2,7 @@
 #define LCD_1602A_H
 
 void lcd_1602a_init();
-void lcd_1602a_write_text(const char* str);
+void lcd_1602a_write_text(const char *str);
 
 // void lcd_1602a_test();
 
