@@ -87,9 +87,13 @@ void lcd_1602a_write_settings(int *states) {
     HAL_GPIO_WritePin(LCD1_ENABLE_GPIO_Port, LCD1_ENABLE_Pin, GPIO_PIN_RESET);
 }
 
-void lcd_1602a_init() {
+void lcd_1602a_clear_screen(void) {
     int lcd_1602a_clear_display[N_DATA_LINES] = {1, 0, 0, 0, 0, 0, 0, 0};
     lcd_1602a_write_settings(lcd_1602a_clear_display);
+}
+
+void lcd_1602a_init() {
+    lcd_1602a_clear_screen();
 
     int lcd_1602a_return_home[N_DATA_LINES] = {0, 1, 0, 0, 0, 0, 0, 0};
     lcd_1602a_write_settings(lcd_1602a_return_home);
@@ -146,8 +150,13 @@ void lcd_1602a_write_char(uint8_t c) {
 }
 
 void lcd_1602a_write_text(const char *str) {
+    lcd_1602a_clear_screen();
     while (*str) {
-        if (*str >= 'A' && *str <= 'Z') {
+        if (*str == '#') { // sharp note
+            lcd_1602a_write_char(0b11000100);
+        } else if (*str == 'b') { // flat note
+            lcd_1602a_write_char(0b01000110);
+        } else if (*str >= 'A' && *str <= 'Z') {
             lcd_1602a_write_char(lcd_1602a_all_letters[*str - 'A']);
         } else if (*str >= '0' && *str <= '9') {
             lcd_1602a_write_char(lcd_1602a_all_numbers[*str - '0']);

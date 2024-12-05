@@ -438,7 +438,92 @@ void elaborate_decay(int16_t *corpo, size_t corpo_len, int16_t *decay, size_t de
 
 #if defined(PEDALINATOR_ADVANCED_PITCH_MODULATION) || defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || \
     defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
+
 #include "sample_22kHz_D2.h"
+
+#if defined(PEDALINATOR_PHASE_VOCODER_ENABLED)
+
+
+size_t phase_vocoder(int16_t *target_note, size_t target_len, int16_t *base_note, size_t base_note_len, int dsem) {
+    
+    // // Apply Hann window
+    // hann_window(hann, FRAME_SIZE);
+    // for (int i = 0; i < FRAME_SIZE; i++) {
+    //     signal[i] *= hann[i];
+    // }
+
+    // // Perform FFT
+    // fft(signal, FRAME_SIZE);    
+
+    int16_t fft_buf[CURRENT_NOTE_L];
+
+    const arm_cfft_instance_q15 cfft_instance = { 
+        .fftLen = target_len,                   /**< length of the FFT. */
+        .pTwiddle = NULL, // const q15_t *pTwiddle;             /**< points to the Twiddle factor table. */
+        .pBitRevTable = NULL, // const uint16_t *pBitRevTable;      /**< points to the bit reversal table. */
+        .bitRevLength = 0             /**< bit reversal table length. */
+    };
+
+    const arm_rfft_instance_q15 fft_instance = {
+        .fftLenReal = target_len,              /**< length of the real FFT. */
+        .ifftFlagR = 0,                        /**< flag that selects forward (ifftFlagR=0) or inverse (ifftFlagR=1) transform. */
+        .bitReverseFlagR = 0,                  /**< flag that enables (bitReverseFlagR=1) or disables (bitReverseFlagR=0) bit reversal of output. */
+        .twidCoefRModifier = 0,                /**< twiddle coefficient modifier that supports different size FFTs with the same twiddle factor table. */
+        .pTwiddleAReal = NULL, // const q15_t *pTwiddleAReal;   /**< points to the real twiddle factor table. */
+        .pTwiddleBReal = NULL, // const q15_t *pTwiddleBReal;   /**< points to the imag twiddle factor table. */
+        .pCfft = &cfft_instance, // const arm_cfft_instance_q15 *pCfft;    /**< points to the complex FFT instance. */
+    };
+
+    arm_rfft_q15(&fft_instance, base_note, fft_buf);
+
+    // Time-stretch: Modify phase and overlap
+    // [Details omitted for brevity—phase unwrapping, modification]
+
+    const arm_cfft_instance_q15 inverse_cfft_instance = { 
+        .fftLen = target_len,                   /**< length of the FFT. */
+        .pTwiddle = NULL, // const q15_t *pTwiddle;             /**< points to the Twiddle factor table. */
+        .pBitRevTable = NULL, // const uint16_t *pBitRevTable;      /**< points to the bit reversal table. */
+        .bitRevLength = 0             /**< bit reversal table length. */
+    };
+
+    const arm_rfft_instance_q15 inverse_fft_instance = {
+        .fftLenReal = target_len,              /**< length of the real FFT. */
+        .ifftFlagR = 0,                        /**< flag that selects forward (ifftFlagR=0) or inverse (ifftFlagR=1) transform. */
+        .bitReverseFlagR = 1,                  /**< flag that enables (bitReverseFlagR=1) or disables (bitReverseFlagR=0) bit reversal of output. */
+        .twidCoefRModifier = 0,                /**< twiddle coefficient modifier that supports different size FFTs with the same twiddle factor table. */
+        .pTwiddleAReal = NULL, // const q15_t *pTwiddleAReal;   /**< points to the real twiddle factor table. */
+        .pTwiddleBReal = NULL, // const q15_t *pTwiddleBReal;   /**< points to the imag twiddle factor table. */
+        .pCfft = &cfft_instance, // const arm_cfft_instance_q15 *pCfft;    /**< points to the complex FFT instance. */
+    };
+
+    arm_rfft_q15(&inverse_fft_instance, fft_buf, target_note);
+
+    // // Overlap and Add (OLA)
+    // // [Details omitted for brevity]
+    
+}
+
+
+size_t attacco_pitch_shifting(int16_t *target_note, size_t target_len, int16_t *base_note, size_t base_note_len, int dsem) {
+    return phase_vocoder(target_note, target_len, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, dsem);
+}
+
+size_t corpo_pitch_shifting(int16_t *target_note, size_t target_len, int16_t *base_note, size_t base_note_len, int dsem) {
+    return phase_vocoder(target_note, target_len, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, dsem);
+}
+
+size_t decay_pitch_shifting(int16_t *target_note, size_t target_len, int16_t *base_note, size_t base_note_len, int dsem) {
+    // take base note and pitch shift
+    size_t len = phase_vocoder(target_note, target_len, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, dsem);
+    // then apply decay effect
+    double TAU = (((double)target_len) / 15.0);
+    for (size_t idx = 0; idx < target_len; idx++) {
+        target_note[idx]  = target_note[idx] * exp(-(idx / TAU));
+    }
+    return target_len;
+}
+
+#else
 /* // WORKING PYTHON ALGORITHM
  lp = LOOP_POINT_DATA[sample]["lp_start"]
 ls = LOOP_POINT_DATA[sample]["lp_stop"]
@@ -505,12 +590,44 @@ size_t corpo_pitch_shifting(int16_t *curr, size_t curr_max_len, int16_t *base, s
     // TODO: implement also time_stretching
     return L;
 }
-#endif
+#endif // PEDALINATOR_PHASE_VOCODER_ENABLED
+
+#endif // PEDALINATOR_ADVANCED_PITCH_MODULATION or PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA or PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA
 
 #if defined(PEDALINATOR_FOUR_SIMPLE_NOTES_WITH_DMA) || defined(PEDALINATOR_DEFINITIVE_FOUR_NOTES_WITH_DMA)
-#include "sample_22kHz_D1.h"
 
 uint32_t log_prevtime = 0;
+
+typedef enum {
+    note_c,
+    note_c_sharp,
+    note_d,
+    note_e_flat,
+    note_e,
+    note_f,
+    note_f_sharp,
+    note_g,
+    note_g_sharp,
+    note_a,
+    note_b_flat,
+    note_b,
+    n_notes,
+} note_names_t;
+
+static const char note_names[n_notes][3] = {
+    "C",
+    "C#",
+    "D",
+    "Eb",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "Bb",
+    "B",
+};
 
 inline size_t min(size_t x, size_t y) {
     return (x > y) ? (y) : (x);
@@ -638,68 +755,90 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
      * new_ns 1000100
      * old_ns 0100100
      */
-    unsigned int keep_notes = nstate & pstate;      // do the corpo
-    unsigned int new_notes  = nstate ^ keep_notes;  // do the attacco
-    unsigned int old_noted  = pstate ^ keep_notes;  // do the rilascio
+    uint32_t keep_notes = nstate & pstate;      // do the corpo
+    uint32_t new_notes  = nstate ^ keep_notes;  // do the attacco
+    uint32_t old_notes  = pstate ^ keep_notes;  // do the rilascio
     int16_t tmp_adder[CURRENT_NOTE_L];
     int16_t tmp_time_stretcher[CURRENT_NOTE_L];
     size_t tmp_adder_len = 0;
     size_t tmp_time_stretcher_len = 0;
+    char display_notes_buf[BUFSIZ];
+    size_t display_ptr = 0;
 
     memset(current_note, 0, current_note_max_len);
 
-    if (HAL_GetTick() - log_prevtime > 500) {
-        print(
-            "%d|%d|%d|%d|%d; \r\n",
-            (new_notes >> 0) & 1 || (keep_notes >> 0) & 1,
-            (new_notes >> 1) & 1 || (keep_notes >> 1) & 1,
-            (new_notes >> 2) & 1 || (keep_notes >> 2) & 1,
-            (new_notes >> 3) & 1 || (keep_notes >> 3) & 1,
-            (new_notes >> 4) & 1 || (keep_notes >> 4) & 1);
-        log_prevtime = HAL_GetTick();
+    // if (HAL_GetTick() - log_prevtime > 500) {
+    //     print(
+    //         "%d|%d|%d|%d|%d; \r\n",
+    //         (new_notes >> 0) & 1 || (keep_notes >> 0) & 1,
+    //         (new_notes >> 1) & 1 || (keep_notes >> 1) & 1,
+    //         (new_notes >> 2) & 1 || (keep_notes >> 2) & 1,
+    //         (new_notes >> 3) & 1 || (keep_notes >> 3) & 1,
+    //         (new_notes >> 4) & 1 || (keep_notes >> 4) & 1);
+    //     log_prevtime = HAL_GetTick();
+    // }
+
+    size_t ctst = SAMPLE_D2_22KHZ_CORPO_L; // chosen_time_stretching_target
+    size_t n_notes = 0;
+
+#if defined(PEDALINATOR_PHASE_VOCODER_ENABLED)
+
+    for (size_t isem = 0; isem < 12; isem++) {
+        if ((new_notes >> isem) & 1) {
+            attacco_pitch_shifting(tmp_adder, ctst, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, isem);
+            // TODO: check ctst == return value of pitch shifting
+            arm_add_q15(current_note, tmp_adder, current_note, ctst);
+        } else if ((keep_notes >> isem) & 1) {
+            corpo_pitch_shifting(tmp_adder, ctst, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+            // TODO: check ctst == return value of pitch shifting
+            arm_add_q15(current_note, tmp_adder, current_note, ctst);
+        } 
+        /* 
+            else if ((old_notes >> isem) & 1) {
+                decay_pitch_shifting(tmp_adder, ctst, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+                // TODO: check ctst == return value of pitch shifting
+                arm_add_q15(current_note, tmp_adder, current_note, ctst);
+        } 
+        */
+
+        if ((new_notes >> isem) & 1 && (keep_notes >> isem) & 1) {
+            int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
+            display_ptr += to_add;
+        }
     }
 
-    size_t chosen_time_stretching_target = SAMPLE_D2_22KHZ_CORPO_L;
-    size_t n_notes = 0;
+    lcd_1602a_write_text(display_notes_buf);
+
+    if (n_notes > 1)
+        arm_scale_q15(current_note, 0xFFFF / n_notes, 0, current_note, current_note_max_len);
+        
+    return ctst;
+
+#else
 
     for (size_t isem = 0; isem < 12; isem++) {
         if (((new_notes >> isem) & 1) || ((keep_notes >> isem) & 1)) {
             tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
             current_note_max_len = min(current_note_max_len, tmp_adder_len);
-            // time_stretching(tmp_time_stretcher, CURRENT_NOTE_L, tmp_adder, tmp_adder_len, chosen_time_stretching_target);
-
-            arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len); // time stretching
+            arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
             n_notes++;
-            // for (size_t i = 0; i < chosen_time_stretching_target; i++) {
-                // current_note[i] /= 2;
-            // }
-
-// #define ONE_HALF_SCALE 16384 // 0.5 in 1.15 format
-            // arm_scale_q15(current_note, ONE_HALF_SCALE, int8_t shift, q15_t *pDst, uint32_t blockSize);
-            // for (size_t inote = 0; inote < current_note_max_len; inote++) {
-                // current_note[inote] = tmp_adder[inote];
-            // }
+            int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
+            display_ptr += to_add;
         }
-        /* 
-            if ((keep_notes >> isem) & 1) {
-                tmp_adder_sz = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
-                current_note_max_len = min(current_note_max_len, tmp_adder_sz);
-                for (size_t inote = 0; inote < current_note_max_len; inote++) {
-                    current_note[inote] += tmp_adder[inote];
-                }
-            } else if ((new_notes >> isem) & 1) {
-                // tmp_adder_sz = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
-            } else if ((old_noted >> isem) & 1) {
-
-            } 
-        */
     }
 
+    // int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%lu %lu %lu P %u N %u", keep_notes, new_notes, old_notes, pstate, nstate);
+    // display_ptr += to_add;
+    lcd_1602a_write_text(display_notes_buf);
+
     print("\r\n");
-    if (n_notes > 1)
-        arm_scale_q15(current_note, 0xFFFF / n_notes, 0, current_note, current_note_max_len);
+
+    // consider whether to include it
+    // if (n_notes > 1)
+        // arm_scale_q15(current_note, 0xFFFF / n_notes, 0, current_note, current_note_max_len);
 
     return current_note_max_len;
+#endif
 }
 
 #endif
@@ -919,28 +1058,29 @@ int main(void) {
 
 #define N_PEDALINATOR_NOTES (5) // MAX 31 NOTES
     static GPIO_TypeDef *button_notes_ports[N_PEDALINATOR_NOTES] = {
+        NOTA5_GPIO_Port,
         NOTA1_GPIO_Port,
         NOTA2_GPIO_Port,
         NOTA3_GPIO_Port,
         NOTA4_GPIO_Port,
-        NOTA5_GPIO_Port,
     };
 
     const static uint16_t button_notes_pins[N_PEDALINATOR_NOTES] = {
+        NOTA5_Pin,
         NOTA1_Pin,
         NOTA2_Pin,
         NOTA3_Pin,
         NOTA4_Pin,
-        NOTA5_Pin,
     };
 
-    bool ready_to_play_note   = true;
-    bool has_to_play_note     = false;
+    volatile bool ready_to_play_note   = true;
+    volatile bool has_to_play_note     = false;
+    volatile bool has_to_change_note   = false;
     uint8_t active_buffer_sai = 0;
     // bool first_half = true;
     // uint8_t inactive_buffer_sai  = 1;
     uint32_t pstate          = (1 << N_PEDALINATOR_NOTES) - 1;
-    uint32_t buffer_notes[2] = {0};
+    // uint32_t buffer_notes[2] = {0};
     HAL_StatusTypeDef result = HAL_OK;
 
     result = HAL_DMA_RegisterCallback(&handle_GPDMA1_Channel11, HAL_DMA_XFER_CPLT_CB_ID, pedalinator_dma_completed_transfer_cb);
@@ -1204,7 +1344,6 @@ int main(void) {
 
             sai_transfer_completed = false;
             sai_is_transmitting    = true;
-            active_buffer_sai = !active_buffer_sai;
             HAL_SAI_Transmit_DMA(
                 &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
@@ -1219,7 +1358,15 @@ int main(void) {
             ready_to_play_note  = false;
             sai_is_transmitting = true;
 
-            active_buffer_sai = !active_buffer_sai;
+            HAL_SAI_Transmit_DMA(
+                &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
+            HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+        } else if (has_to_change_note) {
+            has_to_change_note = false;
+            ready_to_play_note = false;
+            sai_is_transmitting = true;
+
+            HAL_SAI_DMAStop(&hsai_BlockA1);
             HAL_SAI_Transmit_DMA(
                 &hsai_BlockA1, ((uint8_t *)doublebuffer_sai[active_buffer_sai]), (uint16_t)doublebuffer_sai_len[active_buffer_sai]);
             HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
@@ -1231,6 +1378,7 @@ int main(void) {
         if (pstate == ALL_KEYS_RELEASED && nstate == ALL_KEYS_RELEASED) {
             // np to np
             // ensure that no note is played
+            lcd_1602a_clear_screen();
             has_to_play_note = false;
         }
         // else if (pstate == 0b1111 && nstate != 0b1111) { // Covered in the last case
@@ -1245,12 +1393,15 @@ int main(void) {
             has_to_play_note = true;
             // memcpy(doublebuffer_sai[!active_buffer_sai], doublebuffer_sai[active_buffer_sai], doublebuffer_sai_len[active_buffer_sai] * sizeof(int16_t));
         } else {
+            // TODO: avoid interrupting the wave, either wait for the DMA to finish transmitting or start the note with an offset (very cool ngl)
+            #warning avoid interrupting the wave 
             // np to p
             // p different note
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
-            has_to_play_note                         = true;
+            // has_to_play_note                         = true;
+            has_to_change_note = true;
             doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
-            buffer_notes[!active_buffer_sai]         = nstate;
+            active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;
 #endif
