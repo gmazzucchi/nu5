@@ -97,6 +97,8 @@ sourceFiles:
   - Core/Lib/tinyusb/src/**/*.c
   - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_add_q15.c
   - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_scale_q15.c
+  - Drivers/CMSIS/DSP/Source/FastMathFunctions/FastMathFunctions.c
+  - Drivers/CMSIS/DSP/Source/CommonTables/CommonTables.c
   # - Drivers/CMSIS/DSP/Source/**/*.c
 
 

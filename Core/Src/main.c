@@ -727,9 +727,9 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
     return current_note_length;
 }
 
-size_t time_stretching(tmp_adder, tmp_adder_len, chosen_time_stretching_target) {
-    
-}
+// size_t time_stretching(tmp_adder, tmp_adder_len, chosen_time_stretching_target) {
+//     return 1;
+// }
 
 /**
  * @brief Given the set of keys, it composes the waveform data to be played via I2S
@@ -741,6 +741,89 @@ size_t time_stretching(tmp_adder, tmp_adder_len, chosen_time_stretching_target) 
  * @return size_t 
  */
 size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
+    uint32_t keep_notes = nstate & pstate;      // do the corpo
+    uint32_t new_notes  = nstate ^ keep_notes;  // do the attacco
+    uint32_t old_notes  = pstate ^ keep_notes;  // do the rilascio
+    int16_t tmp_adder[CURRENT_NOTE_L];
+    int16_t tmp_time_stretcher[CURRENT_NOTE_L];
+    size_t tmp_adder_len = 0;
+    size_t tmp_time_stretcher_len = 0;
+    char display_notes_buf[BUFSIZ];
+    size_t display_ptr = 0;
+
+    memset(current_note, 0, current_note_max_len);
+
+    size_t ctst = SAMPLE_D2_22KHZ_CORPO_L; // chosen_time_stretching_target
+    size_t n_notes = 0;
+
+    for (size_t isem = 0; isem < 12; isem++) {
+        
+        /* 
+            As it should be...
+            if ((nstate >> isem) & 1) {
+                int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
+                display_ptr += to_add;
+            }
+
+            if ((new_notes >> isem) & 1) {
+                tmp_adder_len        = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, isem);
+                current_note_max_len = min(current_note_max_len, tmp_adder_len);
+                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+                n_notes++;
+            } else if ((keep_notes >> isem) & 1) {
+                tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+                current_note_max_len = min(current_note_max_len, tmp_adder_len);
+                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+                n_notes++;
+            } 
+        */
+
+        if ((new_notes >> isem) & 1 || (keep_notes >> isem) & 1) {
+            // tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+            // #define N_MAGIC_COEFFS (9)
+            // const static double magic_coeffs[N_MAGIC_COEFFS] = {1.0, 0.8, 0.6, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1};
+            #define N_MAGIC_COEFFS (6)
+            const static double magic_coeffs[N_MAGIC_COEFFS] = {1.0, 0.3, 0.1, 0.05, 0.02, 0.01};
+
+            #define N_NOTE_FREQS (30)
+            const static double note_frequencies[30] = {32.7032, 34.64783346745091, 36.70810085827109, 38.89087812335699, 41.20345007892202, 43.65353471889347, 46.249308972999806, 48.9994359965135, 51.913094082726424, 55.00000729465056, 58.270477918174294, 61.73542084498391, 65.4064, 69.29566693490182, 73.41620171654218, 77.78175624671398, 82.40690015784403, 87.30706943778694, 92.49861794599961, 97.998871993027, 103.82618816545286, 110.00001458930112, 116.54095583634859, 123.47084168996786, 130.8128, 138.59133386980363, 146.83240343308432, 155.56351249342796, 164.81380031568807, 174.61413887557384};
+            
+            const q15_t f0 = note_frequencies[isem];
+            for (int iv = 0; iv < SAMPLE_D2_22KHZ_CORPO_L; iv++) {
+                q15_t magic_sum = 0;
+                for (int h = 0; h < N_MAGIC_COEFFS; h++) {
+                    q15_t fh = (h + 1) * f0;
+                    magic_sum += (magic_coeffs[h] * arm_sin_q15(iv*2*3.14*fh)) / N_MAGIC_COEFFS;
+                }
+                tmp_adder[iv] = magic_sum;
+            }
+            // arm_scale_q15(tmp_adder, N_MAGIC_COEFFS, 0, tmp_adder, SAMPLE_D2_22KHZ_CORPO_L);
+            tmp_adder_len = SAMPLE_D2_22KHZ_CORPO_L;
+            
+            current_note_max_len = min(current_note_max_len, tmp_adder_len);
+            arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+            n_notes++;
+            int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
+            display_ptr += to_add;
+        } else if ((keep_notes >> isem) & 1) {
+
+        }
+    }
+
+    // int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%lu %lu %lu P %u N %u", keep_notes, new_notes, old_notes, pstate, nstate);
+    // display_ptr += to_add;
+    lcd_1602a_write_text(display_notes_buf);
+
+    print("\r\n");
+
+    // consider whether to include it
+    // if (n_notes > 1)
+    //     arm_scale_q15(current_note, n_notes, 0, current_note, current_note_max_len);
+
+    return current_note_max_len;
+}
+
+size_t compose_note2(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
     // placeholder
 
     // memcpy(current_note, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L * sizeof(uint16_t));
@@ -816,14 +899,38 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
 
 #else
 
+
     for (size_t isem = 0; isem < 12; isem++) {
-        if (((new_notes >> isem) & 1) || ((keep_notes >> isem) & 1)) {
+        
+        /* 
+            As it should be...
+            if ((nstate >> isem) & 1) {
+                int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
+                display_ptr += to_add;
+            }
+
+            if ((new_notes >> isem) & 1) {
+                tmp_adder_len        = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, isem);
+                current_note_max_len = min(current_note_max_len, tmp_adder_len);
+                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+                n_notes++;
+            } else if ((keep_notes >> isem) & 1) {
+                tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
+                current_note_max_len = min(current_note_max_len, tmp_adder_len);
+                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+                n_notes++;
+            } 
+        */
+
+        if ((new_notes >> isem) & 1) {
             tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
             current_note_max_len = min(current_note_max_len, tmp_adder_len);
             arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
             n_notes++;
             int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
             display_ptr += to_add;
+        } else if ((keep_notes >> isem) & 1) {
+
         }
     }
 
@@ -835,7 +942,7 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
 
     // consider whether to include it
     // if (n_notes > 1)
-        // arm_scale_q15(current_note, 0xFFFF / n_notes, 0, current_note, current_note_max_len);
+    // arm_scale_q15(current_note, 8, 0, current_note, current_note_max_len);
 
     return current_note_max_len;
 #endif
