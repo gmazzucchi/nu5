@@ -731,6 +731,85 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
 //     return 1;
 // }
 
+void smooth_loop(q15_t *buffer, int length, int len)
+{
+    int fade_len = len;
+    for (int i = 0; i < fade_len; i++) {
+        float fade_out = (float)(fade_len - i) / fade_len;
+        float fade_in  = (float)i / fade_len;
+
+        int end_idx = length - fade_len + i;
+        float blended = buffer[end_idx] * fade_out + buffer[i] * fade_in;
+        buffer[i] = (q15_t)blended;  // sostituisci l’inizio con il crossfade
+    }
+}
+
+#define SMOOTH_LEN 128   // number of samples for crossfade (tweak as needed)
+
+void smooth_loop2(q15_t* note, size_t len)
+{
+    if (len < 2 * SMOOTH_LEN)
+        return; // buffer too short
+
+    q15_t fade_in[SMOOTH_LEN];
+    q15_t fade_out[SMOOTH_LEN];
+    q15_t tmp[SMOOTH_LEN];
+
+    // Generate linear ramp: fade_in = [0 .. 1], fade_out = [1 .. 0]
+    for (int i = 0; i < SMOOTH_LEN; i++) {
+        float32_t w = (float32_t)i / (float32_t)(SMOOTH_LEN - 1);
+        fade_in[i]  = (q15_t)(w * 32767.0f);
+        fade_out[i] = (q15_t)((1.0f - w) * 32767.0f);
+    }
+
+    // Multiply tails by fades
+    // tmp = start * fade_out + end * fade_in
+    for (int i = 0; i < SMOOTH_LEN; i++) {
+        q15_t a = note[i];
+        q15_t b = note[len - SMOOTH_LEN + i];
+        q15_t fa = fade_out[i];
+        q15_t fb = fade_in[i];
+
+        // weighted sum using Q15 multiply-accumulate
+        q31_t mix;
+        mix  = (q31_t)a * fa; // Q15 * Q15 -> Q30
+        mix += (q31_t)b * fb;
+        mix >>= 15;           // back to Q15
+        tmp[i] = (q15_t)__SSAT(mix, 16);
+    }
+
+    // Write smoothed transition into both ends
+    memcpy(note, tmp, SMOOTH_LEN * sizeof(q15_t));
+    memcpy(note + len - SMOOTH_LEN, tmp, SMOOTH_LEN * sizeof(q15_t));
+
+    // Optional: low-pass smoothing of the boundary region
+    // Apply a simple FIR with CMSIS-DSP
+    static const q15_t lp_coeffs[5] = {
+        6554, 13107, 19660, 13107, 6554 // ~Hamming low-pass kernel (sum = 0.999)
+    };
+    q15_t state[5 + SMOOTH_LEN - 1];
+    arm_fir_instance_q15 S;
+    arm_fir_init_q15(&S, 5, (q15_t *)lp_coeffs, state, SMOOTH_LEN);
+    arm_fir_q15(&S, tmp, tmp, SMOOTH_LEN);
+    memcpy(note, tmp, SMOOTH_LEN * sizeof(q15_t));
+    memcpy(note + len - SMOOTH_LEN, tmp, SMOOTH_LEN * sizeof(q15_t));
+}
+
+#define SMOOTH3_LEN 128
+
+void smooth3_loop(q15_t *note, size_t len) {
+    if (len < 2 * SMOOTH3_LEN) return;
+
+    for (int i = 0; i < SMOOTH3_LEN; i++) {
+        float w = 0.5f * (1.0f - cosf(2.0f * 3.1415926f * i / (SMOOTH3_LEN - 1)));
+        q15_t a = note[i];
+        q15_t b = note[len - SMOOTH3_LEN + i];
+        float sm = (float)a * (1.0f - w) + (float)b * w;
+        note[i] = (q15_t)sm;
+        note[len - SMOOTH3_LEN + i] = (q15_t)sm;
+    }
+}
+
 /**
  * @brief Given the set of keys, it composes the waveform data to be played via I2S
  * 
@@ -745,82 +824,88 @@ size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_n
     uint32_t new_notes  = nstate ^ keep_notes;  // do the attacco
     uint32_t old_notes  = pstate ^ keep_notes;  // do the rilascio
     int16_t tmp_adder[CURRENT_NOTE_L];
-    int16_t tmp_time_stretcher[CURRENT_NOTE_L];
-    size_t tmp_adder_len = 0;
-    size_t tmp_time_stretcher_len = 0;
     char display_notes_buf[BUFSIZ];
     size_t display_ptr = 0;
 
-    memset(current_note, 0, current_note_max_len);
-
-    size_t ctst = SAMPLE_D2_22KHZ_CORPO_L; // chosen_time_stretching_target
+    memset(current_note, 0, CURRENT_NOTE_L * sizeof(current_note[0]));
     size_t n_notes = 0;
+    size_t sofar = CURRENT_NOTE_L;
 
     for (size_t isem = 0; isem < 12; isem++) {
-        
-        /* 
-            As it should be...
-            if ((nstate >> isem) & 1) {
-                int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
-                display_ptr += to_add;
-            }
-
-            if ((new_notes >> isem) & 1) {
-                tmp_adder_len        = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_attacco, SAMPLE_D2_22KHZ_ATTACCO_L, isem);
-                current_note_max_len = min(current_note_max_len, tmp_adder_len);
-                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
-                n_notes++;
-            } else if ((keep_notes >> isem) & 1) {
-                tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
-                current_note_max_len = min(current_note_max_len, tmp_adder_len);
-                arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
-                n_notes++;
-            } 
-        */
-
         if ((new_notes >> isem) & 1 || (keep_notes >> isem) & 1) {
-            // tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
-            // #define N_MAGIC_COEFFS (9)
+            
+#if 0
+            #define N_MAGIC_COEFFS (9)
             // const static double magic_coeffs[N_MAGIC_COEFFS] = {1.0, 0.8, 0.6, 0.4, 0.3, 0.25, 0.2, 0.15, 0.1};
+            const static q15_t magic_scaling[N_MAGIC_COEFFS] = {100, 80, 60, 40, 30, 25, 20, 15, 10};
+            // const static q15_t magic_scaling[N_MAGIC_COEFFS] = {1, 2, 2, 3, 3, 4, 5, 6, 10};
+#else
             #define N_MAGIC_COEFFS (6)
-            const static double magic_coeffs[N_MAGIC_COEFFS] = {1.0, 0.3, 0.1, 0.05, 0.02, 0.01};
-
+            // const static double magic_coeffs[N_MAGIC_COEFFS] = {1.0, 0.3, 0.1, 0.05, 0.02, 0.01};
+            const static double magic_scaling[N_MAGIC_COEFFS] = {100, 30, 10, 5, 2, 1};
+            // const static q15_t magic_scaling[N_MAGIC_COEFFS] = {1.0, 3, 10.0, 20.0, 50.0, 100.0};
+#endif
             #define N_NOTE_FREQS (30)
             const static double note_frequencies[30] = {32.7032, 34.64783346745091, 36.70810085827109, 38.89087812335699, 41.20345007892202, 43.65353471889347, 46.249308972999806, 48.9994359965135, 51.913094082726424, 55.00000729465056, 58.270477918174294, 61.73542084498391, 65.4064, 69.29566693490182, 73.41620171654218, 77.78175624671398, 82.40690015784403, 87.30706943778694, 92.49861794599961, 97.998871993027, 103.82618816545286, 110.00001458930112, 116.54095583634859, 123.47084168996786, 130.8128, 138.59133386980363, 146.83240343308432, 155.56351249342796, 164.81380031568807, 174.61413887557384};
             
-            const q15_t f0 = note_frequencies[isem];
-            for (int iv = 0; iv < SAMPLE_D2_22KHZ_CORPO_L; iv++) {
-                q15_t magic_sum = 0;
-                for (int h = 0; h < N_MAGIC_COEFFS; h++) {
-                    q15_t fh = (h + 1) * f0;
-                    magic_sum += (magic_coeffs[h] * arm_sin_q15(iv*2*3.14*fh)) / N_MAGIC_COEFFS;
+            const double f0 = note_frequencies[isem];
+            q15_t sub_adder[CURRENT_NOTE_L];
+            memset(sub_adder, 0, CURRENT_NOTE_L * sizeof(sub_adder[0]));
+            memset(tmp_adder, 0, CURRENT_NOTE_L * sizeof(tmp_adder[0]));
+
+
+            // il problema è la compatibilità tra q15_t e double... andrebbe scalato tutto e trattati come q15_t
+            for (q15_t h = 0; h < N_MAGIC_COEFFS; h++) {
+                double tmp = 2.0*3.1412*f0;
+                for (q15_t iv = 0; iv < CURRENT_NOTE_L; iv++) {
+                    sub_adder[iv] = arm_sin_q15(iv*(q15_t)(tmp*((double)h + 1.0)));
                 }
-                tmp_adder[iv] = magic_sum;
+                arm_scale_q15(sub_adder, magic_scaling[h], 4, sub_adder, CURRENT_NOTE_L);
+                arm_add_q15(tmp_adder, sub_adder, tmp_adder, CURRENT_NOTE_L);
             }
-            // arm_scale_q15(tmp_adder, N_MAGIC_COEFFS, 0, tmp_adder, SAMPLE_D2_22KHZ_CORPO_L);
-            tmp_adder_len = SAMPLE_D2_22KHZ_CORPO_L;
+
+            sofar = CURRENT_NOTE_L - CURRENT_NOTE_L % ((size_t) (22050.0 / f0));
             
-            current_note_max_len = min(current_note_max_len, tmp_adder_len);
-            arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
+            arm_add_q15(current_note, tmp_adder, current_note, CURRENT_NOTE_L);
+
             n_notes++;
             int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
             display_ptr += to_add;
-        } else if ((keep_notes >> isem) & 1) {
-
         }
     }
-
+    /***
+     * Working on the smooth looping
+     */
+    // for (double i = 0.0; i < 100.0; i++) {
+    //     size_t li = retval - i;
+    //     size_t fi = i;
+    //     q15_t le = current_note[li];
+    //     q15_t fe = current_note[fi];
+    //     current_note[li] = (q15_t) ((double) le * (i / 100.0) +  (double) fe * (100.0 - i / 100.0));
+    //     current_note[fi] = (q15_t) ((double) fe * (i / 100.0) +  (double) le * (100.0 - i / 100.0));
+    // }
+    //smooth_loop2(current_note, retval);
     // int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%lu %lu %lu P %u N %u", keep_notes, new_notes, old_notes, pstate, nstate);
     // display_ptr += to_add;
-    lcd_1602a_write_text(display_notes_buf);
+    // smooth_loop(current_note, retval, 1000);
+    // smooth3_loop(current_note, retval);
 
+    // extern q15_t hamming_window[CURRENT_NOTE_L];
+    // arm_scale_q15(current_note, 1, -8, current_note, CURRENT_NOTE_L);
+    // arm_mult_q15(current_note, hamming_window, current_note, CURRENT_NOTE_L);
+    // arm_scale_q15(current_note, 1, -8, current_note, CURRENT_NOTE_L);
+    
+    // ok this works but it fades too much to silence...
+    // const size_t FOO = 2000;
+    // for (int i = 0; i < FOO; i++) {
+    //     current_note[CURRENT_NOTE_L - i] = current_note[CURRENT_NOTE_L - i] * ((double)i / (double) FOO);
+    //     current_note[i] = current_note[i] * ((double)i / (double) FOO);
+    // }
+
+    lcd_1602a_write_text(display_notes_buf);
     print("\r\n");
 
-    // consider whether to include it
-    // if (n_notes > 1)
-    //     arm_scale_q15(current_note, n_notes, 0, current_note, current_note_max_len);
-
-    return current_note_max_len;
+    return sofar;
 }
 
 size_t compose_note2(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
@@ -922,16 +1007,14 @@ size_t compose_note2(unsigned int nstate, unsigned int pstate, int16_t *current_
             } 
         */
 
-        if ((new_notes >> isem) & 1) {
+        if (((new_notes >> isem) & 1) || ((keep_notes >> isem) & 1)) {
             tmp_adder_len         = corpo_pitch_shifting(tmp_adder, CURRENT_NOTE_L, sample_D2_22kHz_corpo, SAMPLE_D2_22KHZ_CORPO_L, isem);
             current_note_max_len = min(current_note_max_len, tmp_adder_len);
             arm_add_q15(current_note, tmp_adder, current_note, current_note_max_len);
             n_notes++;
             int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%s ", note_names[note_d + isem]);
             display_ptr += to_add;
-        } else if ((keep_notes >> isem) & 1) {
-
-        }
+        } 
     }
 
     // int to_add = snprintf(display_notes_buf + display_ptr, BUFSIZ - display_ptr, "%lu %lu %lu P %u N %u", keep_notes, new_notes, old_notes, pstate, nstate);
@@ -1507,7 +1590,7 @@ int main(void) {
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             // has_to_play_note                         = true;
             has_to_change_note = true;
-            doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            doublebuffer_sai_len[!active_buffer_sai] = compose_note2(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
             active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;

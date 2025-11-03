@@ -29,7 +29,7 @@
 #define C_ATTACCO_MAX_L (50000U)
 #define C_CORPO_MAX_L   (50000U)
 #define C_DECAY_MAX_L   (50000U)
-#define CURRENT_NOTE_L  (50000U)
+#define CURRENT_NOTE_L  (50000U) // MUST BE FIXED AD 15000 due to the Hamming Windows
 #endif
 
 #ifdef PEDALINATOR_ALL_NOTES_STORED
