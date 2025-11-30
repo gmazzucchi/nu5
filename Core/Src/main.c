@@ -820,6 +820,20 @@ void smooth3_loop(q15_t *note, size_t len) {
  * @return size_t 
  */
 size_t compose_note(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
+
+    // right period
+    /*
+        * const double f0 = 884.0;
+        * size_t period = (size_t)((2<<15) / f0);
+        * size_t limit = CURRENT_NOTE_L - CURRENT_NOTE_L % period;
+        * // 2*3.1412*limit*f0 = 2<<15
+        * const size_t N_LOOPS = 10;
+        * for (size_t inote = 0; inote < period * N_LOOPS; inote++) {
+        *     current_note[inote] = arm_sin_q15(inote * f0) / 8;
+        * }
+        * return period * N_LOOPS;
+    */
+
     uint32_t keep_notes = nstate & pstate;      // do the corpo
     uint32_t new_notes  = nstate ^ keep_notes;  // do the attacco
     uint32_t old_notes  = pstate ^ keep_notes;  // do the rilascio
@@ -1590,7 +1604,7 @@ int main(void) {
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             // has_to_play_note                         = true;
             has_to_change_note = true;
-            doublebuffer_sai_len[!active_buffer_sai] = compose_note2(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
             active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;
