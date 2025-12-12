@@ -101,6 +101,7 @@ sourceFiles:
   - Drivers/CMSIS/DSP/Source/CommonTables/CommonTables.c
   - Drivers/CMSIS/DSP/Source/FilteringFunctions/FilteringFunctions.c
   - Drivers/CMSIS/DSP/Source/BasicMathFunctions/BasicMathFunctions.c
+  - Drivers/CMSIS/DSP/Source/TransformFunctions/TransformFunctions.c
   # - Drivers/CMSIS/DSP/Source/**/*.c
 
 

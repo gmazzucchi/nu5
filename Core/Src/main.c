@@ -810,6 +810,70 @@ void smooth3_loop(q15_t *note, size_t len) {
     }
 }
 
+size_t compose_note3(unsigned int nstate, unsigned int pstate, int16_t *current_note, size_t current_note_max_len) {
+    uint32_t keep_notes = nstate & pstate;      // do the corpo
+    uint32_t new_notes  = nstate ^ keep_notes;  // do the attacco
+    uint32_t old_notes  = pstate ^ keep_notes;  // do the rilascio
+
+    const size_t fftlen = 4096U;
+    arm_cfft_instance_q15 fft_instance;
+    arm_status status = arm_cfft_init_q15(&fft_instance, fftlen);
+    if (status != 0) {
+        print("[FFT ERROR] init function status is: %d\r\n", (int)status);
+        return 0;
+    }
+    q15_t data[fftlen];
+    memset(data, 0, fftlen * sizeof(data[0]));
+
+#define N_MAGIC_COEFFS (6)
+    const static double additive_synthesis_coeffs[N_MAGIC_COEFFS] = {100, 30, 10, 5, 2, 1};
+    size_t cfftlen = fftlen;
+    size_t cfreq = 0;
+    for (size_t icoeff = 0; icoeff < N_MAGIC_COEFFS; icoeff++) {
+        cfftlen /= 2;
+        cfreq += cfftlen;
+        data[cfreq] = additive_synthesis_coeffs[icoeff];
+    }
+    arm_cfft_q15(&fft_instance, data, 0, 0);
+    HAL_Delay(1000);
+    return 0;
+
+#define lensample (16 * 2)
+#define fftlen (16)
+    arm_cfft_instance_q15 fft_instance;
+    arm_status status = arm_cfft_init_q15(&fft_instance, fftlen);
+    if (status != 0) {
+        while (1) {
+            print("[FFT ERROR] init function status is: %d\r\n", (int)status);
+            HAL_Delay(1000);
+        }
+    }
+    q15_t data[lensample] = {0};
+    memset(data, 0, lensample * sizeof(data[0]));
+    char obuf[BUFSIZ]; size_t obufptr = 0;
+    char ibuf[BUFSIZ]; size_t ibufptr = 0;
+    for (size_t ismp = 0; ismp < lensample; ismp++) {
+        q15_t x = ismp * (INT16_MAX / 16);
+        data[ismp] = arm_sin_q15(x);
+        size_t to_add = snprintf(ibuf + ibufptr, BUFSIZ - ibufptr, "%" PRIi16 ", ", data[ismp]);
+        ibufptr += to_add;
+    }
+    ibuf[ibufptr] = 0;
+    arm_cfft_q15(&fft_instance, data, 0, 0);
+    for (size_t ismp = 0; ismp < lensample; ismp++) {
+        size_t to_add = snprintf(obuf + obufptr, BUFSIZ - obufptr, "%" PRIi16 ",", data[ismp]);
+        obufptr += to_add;
+    }
+    obuf[obufptr] = 0;
+    while (1) {
+        print("input:  %s\r\n", ibuf);
+        print("output: %s\r\n", obuf);
+        HAL_Delay(1000);
+    }
+    
+}
+
+#if 0
 /**
  * @brief Given the set of keys, it composes the waveform data to be played via I2S
  * 
@@ -1044,6 +1108,7 @@ size_t compose_note2(unsigned int nstate, unsigned int pstate, int16_t *current_
     return current_note_max_len;
 #endif
 }
+#endif // if 0
 
 #endif
 
@@ -1122,6 +1187,43 @@ int main(void) {
         HAL_Delay(500);
     }
  */
+
+#if 0
+
+#define lensample (16 * 2)
+#define fftlen (16)
+    arm_cfft_instance_q15 fft_instance;
+    arm_status status = arm_cfft_init_q15(&fft_instance, fftlen);
+    if (status != 0) {
+        while (1) {
+            print("[FFT ERROR] init function status is: %d\r\n", (int)status);
+            HAL_Delay(1000);
+        }
+    }
+    q15_t data[lensample] = {0};
+    memset(data, 0, lensample * sizeof(data[0]));
+    char obuf[BUFSIZ]; size_t obufptr = 0;
+    char ibuf[BUFSIZ]; size_t ibufptr = 0;
+    for (size_t ismp = 0; ismp < lensample; ismp++) {
+        q15_t x = ismp * (INT16_MAX / 16);
+        data[ismp] = arm_sin_q15(x);
+        size_t to_add = snprintf(ibuf + ibufptr, BUFSIZ - ibufptr, "%" PRIi16 ", ", data[ismp]);
+        ibufptr += to_add;
+    }
+    ibuf[ibufptr] = 0;
+    arm_cfft_q15(&fft_instance, data, 0, 0);
+    for (size_t ismp = 0; ismp < lensample; ismp++) {
+        size_t to_add = snprintf(obuf + obufptr, BUFSIZ - obufptr, "%" PRIi16 ",", data[ismp]);
+        obufptr += to_add;
+    }
+    obuf[obufptr] = 0;
+    while (1) {
+        print("input:  %s\r\n", ibuf);
+        print("output: %s\r\n", obuf);
+        HAL_Delay(1000);
+    }
+    
+#endif
 
 #ifdef TEST_TIMER
     const char message[] = "Son vivo\r\n";
@@ -1604,7 +1706,7 @@ int main(void) {
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             // has_to_play_note                         = true;
             has_to_change_note = true;
-            doublebuffer_sai_len[!active_buffer_sai] = compose_note(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            doublebuffer_sai_len[!active_buffer_sai] = compose_note3(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
             active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;
