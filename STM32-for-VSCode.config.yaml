@@ -80,6 +80,7 @@ includeDirectories:
   - Core/Src/**
   - Core/Lib/tinyusb/src/
   - Core/Lib/tinyusb/hw
+  - Core/Lib/libsuoninator/Inc
   - Middlewares/**
   - USBX/**
 
@@ -95,14 +96,15 @@ sourceFiles:
   - Middlewares/**/*.c
   - USBX/**/*.c
   - Core/Lib/tinyusb/src/**/*.c
-  # - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_add_q15.c
-  # - Drivers/CMSIS/DSP/Source/BasicMathFunctions/arm_scale_q15.c
+  - Core/Lib/libsuoninator/Src/**/*.c
   - Drivers/CMSIS/DSP/Source/FastMathFunctions/FastMathFunctions.c
   - Drivers/CMSIS/DSP/Source/CommonTables/CommonTables.c
   - Drivers/CMSIS/DSP/Source/FilteringFunctions/FilteringFunctions.c
   - Drivers/CMSIS/DSP/Source/BasicMathFunctions/BasicMathFunctions.c
   - Drivers/CMSIS/DSP/Source/TransformFunctions/TransformFunctions.c
-  # - Drivers/CMSIS/DSP/Source/**/*.c
+  - Drivers/CMSIS/DSP/Source/ComplexMathFunctions/ComplexMathFunctions.c
+  - Drivers/CMSIS/DSP/Source/StatisticsFunctions/StatisticsFunctions.c
+  - Drivers/CMSIS/DSP/Source/MatrixFunctions/MatrixFunctions.c
 
 
 # When no makefile is present it will show a warning pop-up.

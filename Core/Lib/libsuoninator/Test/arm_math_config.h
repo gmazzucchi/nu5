@@ -1,0 +1,3 @@
+#define ARM_MATH_CM4
+#define ARM_MATH_CM7
+#define ARM_MATH_LOOPUNROLL

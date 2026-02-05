@@ -38,6 +38,8 @@
 #include "arm_math.h"
 #include "math.h"
 #include "pedalinator_config.h"
+#include "additive_synth_gen.h"
+#include "organ_presets.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -731,6 +733,8 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
 //     return 1;
 // }
 
+#if 0
+
 void smooth_loop(q15_t *buffer, int length, int len)
 {
     int fade_len = len;
@@ -872,6 +876,8 @@ size_t compose_note3(unsigned int nstate, unsigned int pstate, int16_t *current_
     }
     
 }
+
+#endif
 
 #if 0
 /**
@@ -1408,6 +1414,30 @@ int main(void) {
     if (result != HAL_OK) {
         Error_Handler();
     }
+
+#define PEDALINATOR_N_INSTRUMENTS (1)
+#define PEDALINATOR_N_KEYS ((N_PEDALINATOR_NOTES / 8) + 1)
+    uint8_t* past_played_notes[PEDALINATOR_N_INSTRUMENTS];
+    uint8_t tmp_past_played_notes[PEDALINATOR_N_KEYS];
+    past_played_notes[0] = tmp_past_played_notes;
+    uint8_t* new_played_notes[PEDALINATOR_N_INSTRUMENTS];
+    uint8_t tmp_new_played_notes[PEDALINATOR_N_KEYS];
+    new_played_notes[0] = tmp_new_played_notes;
+    size_t n_keys_per_instrument[PEDALINATOR_N_INSTRUMENTS];
+    n_keys_per_instrument[0] = PEDALINATOR_N_KEYS;
+    const double* additive_synths_coeffs[PEDALINATOR_N_INSTRUMENTS];
+    additive_synths_coeffs[0] = (double*) ORGAN_PRESET_3;
+    size_t n_coeffs_per_instrument[PEDALINATOR_N_INSTRUMENTS];
+    n_coeffs_per_instrument[0] = ORGAN_PRESET_3_SIZE;
+    
+    const orchestra_t orchestra = {
+        .n_instruments = 1,
+        .past_played_notes = past_played_notes,
+        .new_played_notes = new_played_notes,
+        .n_keys_per_instrument = n_keys_per_instrument,
+        .additive_synths_coeffs = additive_synths_coeffs,
+        .n_coeffs_per_instrument = n_coeffs_per_instrument,
+    };
 #endif
 
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
@@ -1706,7 +1736,11 @@ int main(void) {
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             // has_to_play_note                         = true;
             has_to_change_note = true;
-            doublebuffer_sai_len[!active_buffer_sai] = compose_note3(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            doublebuffer_sai_len[!active_buffer_sai] = additive_synth_compose_note(
+                    doublebuffer_sai[!active_buffer_sai],
+                    CURRENT_NOTE_L,
+                    &orchestra
+                );
             active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;
