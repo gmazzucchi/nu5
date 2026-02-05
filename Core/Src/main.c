@@ -38,6 +38,8 @@
 #include "arm_math.h"
 #include "math.h"
 #include "pedalinator_config.h"
+#include "additive_synth_gen.h"
+#include "organ_presets.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -731,6 +733,8 @@ size_t apply_linear_crossfading(int16_t *current_note, size_t current_note_lengt
 //     return 1;
 // }
 
+#if 0
+
 void smooth_loop(q15_t *buffer, int length, int len)
 {
     int fade_len = len;
@@ -872,6 +876,8 @@ size_t compose_note3(unsigned int nstate, unsigned int pstate, int16_t *current_
     }
     
 }
+
+#endif
 
 #if 0
 /**
@@ -1408,6 +1414,8 @@ int main(void) {
     if (result != HAL_OK) {
         Error_Handler();
     }
+
+    init_orchestra();
 #endif
 
 #ifdef PEDALINATOR_COM_VIRTUAL_PORT_EXAMPLE
@@ -1567,13 +1575,18 @@ int main(void) {
         // GPIO_PinState n3 = !HAL_GPIO_ReadPin(NOTA3_GPIO_Port, NOTA3_Pin);
         // GPIO_PinState n4 = !HAL_GPIO_ReadPin(NOTA4_GPIO_Port, NOTA4_Pin);
         // GPIO_PinState n5 = !HAL_GPIO_ReadPin(NOTA5_GPIO_Port, NOTA5_Pin);
+        // uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3) | (n5 << 4);
         uint32_t nstate = 0;
         for (size_t inote = 0; inote < N_PEDALINATOR_NOTES; inote++) {
             GPIO_PinState state = !HAL_GPIO_ReadPin(button_notes_ports[inote], button_notes_pins[inote]);
             nstate |= (state << inote);
+            if (state == GPIO_PIN_SET) {
+                orchestra_set_note(0, inote + 28);
+            } else {
+                orchestra_unset_note(0, inote + 28);
+            }
         }
 
-        // uint32_t nstate  = n1 | (n2 << 1) | (n3 << 2) | (n4 << 3) | (n5 << 4);
 
 #define PINSTATE_TO_INT(state) (state == GPIO_PIN_SET ? 1 : 0)
 #if defined(PEDALINATOR_DEBUG_ENABLED)
@@ -1706,7 +1719,10 @@ int main(void) {
             // construct the note in the inactive buffer and then swap the buffer at the next iteration
             // has_to_play_note                         = true;
             has_to_change_note = true;
-            doublebuffer_sai_len[!active_buffer_sai] = compose_note3(nstate, pstate, doublebuffer_sai[!active_buffer_sai], CURRENT_NOTE_L);
+            doublebuffer_sai_len[!active_buffer_sai] = additive_synth_compose_note(
+                    doublebuffer_sai[!active_buffer_sai],
+                    CURRENT_NOTE_L
+                );
             active_buffer_sai = !active_buffer_sai;
         }
         pstate = nstate;
